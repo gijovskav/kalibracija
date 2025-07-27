@@ -611,3 +611,15 @@ st.download_button(
     file_name="vnatresna_kalibraciona.xlsx",
     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 )
+
+
+
+try:
+    all_names = set(df_blank_results["Name"].unique()) | set(df_samples_results["Name"].unique())
+    
+except KeyError:
+    st.error("Фалат влезни фајлови потребни за пресметка.")
+except Exception:
+    st.error("Настана неочекувана грешка.")
+
+
