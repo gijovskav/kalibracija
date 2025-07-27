@@ -26,7 +26,8 @@ except KeyError:
     st.error("Фалат влезни фајлови потребни за пресметка.")
 except Exception:
     st.error("Настана неочекувана грешка.")
-
+if "Name" not in df_blank_results.columns or "Name" not in df_samples_results.columns:
+    st.error("Колоната 'Name' ја нема во еден од DataFrame-овите.")
 
 
 
