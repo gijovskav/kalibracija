@@ -427,7 +427,14 @@ if method_external_curve and 'result_df' in locals() and result_df is not None a
 
 
 
+
 #INTERNA
+# Осигурај се дека result_df и std_concentrations се дефинирани
+if 'result_df' not in locals():
+    result_df = None
+if 'std_concentrations' not in locals():
+    std_concentrations = []
+
 # Внатрешна калибрација со крива - извршување само ако се вклучи оваа опција
 if method_internal_curve and result_df is not None and std_concentrations:
 
