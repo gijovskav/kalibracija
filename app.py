@@ -280,8 +280,7 @@ if std_dataframes:
 
 
 #eksterna kalibracija
-if method_external_curve:
-    if result_df is not None and std_concentrations:
+if method_external_curve and 'result_df' in locals() and result_df is not None and std_concentrations:
         calibration_data = []
 
     X_full = np.array(std_concentrations).reshape(-1, 1)
