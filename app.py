@@ -17,6 +17,21 @@ df_samples_results = pd.DataFrame()
 
 
 
+
+
+try:
+    all_names = set(df_blank_results["Name"].unique()) | set(df_samples_results["Name"].unique())
+    
+except KeyError:
+    st.error("Фалат влезни фајлови потребни за пресметка.")
+except Exception:
+    st.error("Настана неочекувана грешка.")
+
+
+
+
+
+
 # --- Избор на методи ---
 st.markdown("### Избери една или повеќе методи за калибрација:")
 method_one_point = st.checkbox("Калибрација со една точка")
@@ -612,14 +627,5 @@ st.download_button(
     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 )
 
-
-
-try:
-    all_names = set(df_blank_results["Name"].unique()) | set(df_samples_results["Name"].unique())
-    
-except KeyError:
-    st.error("Фалат влезни фајлови потребни за пресметка.")
-except Exception:
-    st.error("Настана неочекувана грешка.")
 
 
