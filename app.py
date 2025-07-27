@@ -270,7 +270,7 @@ if std_dataframes:
             else:
                 st.warning(f"⚠️ Стандард {i + 1} нема 'Name' и/или 'Height' колони.")
 
-        st.write("🧪 Собрани висини од сите стандарди:")
+        st.write("### Собрани висини од сите стандарди:")
         st.dataframe(result_df)
     else:
             st.warning("⛔ Првиот стандард мора да ги содржи колоните: Name или name, Height (Hz), height, или Height и RT или RT(min)")
@@ -334,7 +334,7 @@ if method_external_curve:
         df_calibration = pd.DataFrame(calibration_data)
 
         if not df_calibration.empty:
-            st.write("📈 Калибрациона права за надворешна калибрација:")
+            st.write("### Калибрациона права за надворешна калибрација:")
             st.dataframe(df_calibration)
         else:
             st.warning("⚠️ Нема доволно податоци за да се изврши калибрација.")
@@ -375,7 +375,7 @@ if method_external_curve:
     blank_final = None
     if df_blank_processed is not None and not df_calibration.empty:
         blank_final = calculate_concentration_and_mass(df_blank_processed, df_calibration, v_extract)
-        st.markdown("Надворешна калибрациона - Blank:")
+        st.markdown("### Надворешна калибрациона - Blank:")
         st.dataframe(blank_final)
 
     # Пресметка за samples
@@ -483,7 +483,7 @@ if method_internal_curve and result_df is not None and std_concentrations:
             })
 
         df_c_over_cis = pd.DataFrame(regression_results)
-        st.markdown("### 📈 Внатрешна калибрациона права")
+        st.markdown("### Внатрешна калибрациона права")
         st.dataframe(df_c_over_cis)
 
         # 2. Примени ги регресиите на бланкови и семплови
@@ -560,10 +560,10 @@ if method_internal_curve and result_df is not None and std_concentrations:
         if df_blank_results.empty or df_samples_results.empty:
             st.warning("DataFrames се празни, проверете влезните податоци.")
     
-        st.markdown("### Интерна калибрациона - Blank")
+        st.markdown("### Внатрешна калибрациона - Blank")
         st.dataframe(df_blank_results)
 
-        st.markdown("### Интерна калибрациона - Samples")
+        st.markdown("### Внатрешна калибрациона - Samples")
         st.dataframe(df_samples_results)
 
         
@@ -594,7 +594,7 @@ for name in sorted(all_names):
 df_summary = pd.DataFrame(summary_rows)
 
 
-st.markdown("### 📋 Внатрешна калибрациона - сумирано")
+st.markdown("### Внатрешна калибрациона - сумирано")
 st.dataframe(df_summary)
 
         # 3. Генерирај Excel
