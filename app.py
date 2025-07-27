@@ -571,7 +571,7 @@ if method_internal_curve and result_df is not None and std_concentrations:
         # Сумирана табела: секој sample посебна колона
 # Заштита од празни или невалидни DataFrame-и
 if df_blank_results.empty or df_samples_results.empty:
-    st.warning("⚠️ Blank или Sample резултатите се празни – не може да се сумира.")
+    st.warning("Blank или Sample резултатите се празни - прикачи фајлови.")
 else:
     if "Name" in df_blank_results.columns and "Name" in df_samples_results.columns:
         all_names = set(df_blank_results["Name"].unique()) | set(df_samples_results["Name"].unique())
