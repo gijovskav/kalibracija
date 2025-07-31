@@ -427,6 +427,10 @@ if method_external_curve and 'result_df' in locals() and result_df is not None a
 
 
 
+if 'result_df' not in locals() or result_df is None:
+    # Ако нема внесено податоци, или не е дефиниран, сѐ уште не прави ништо
+    st.info("Чекам да се вчитаат податоци (result_df е празен).")
+    st.stop()  # Ова го запира кодот тука додека не се вчитаат податоците
 
 # INTERNA - Внатрешна калибрација со крива - извршување само ако се вклучи оваа опција
 if method_internal_curve and result_df is not None and std_concentrations:
