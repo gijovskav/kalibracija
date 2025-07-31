@@ -56,7 +56,7 @@ if method_internal_curve or method_external_curve or (method_one_point and (meth
 
 
     # Барање број на стандарди само еднаш
-    num_standards = st.number_input("Колку стандарди ќе користите? Ако користите метода на калибрациона права со внатрешен стандард прв ставете го референтниот стандард", min_value=1, max_value=20, value=5, step=1)
+    num_standards = st.number_input("Колку стандарди ќе користите? ", min_value=1, max_value=20, value=5, step=1)
 
     uploaded_std_files = []
     std_concentrations = []
@@ -499,85 +499,95 @@ for i, col in enumerate(height_cols):
         st.markdown("### Внатрешна калибрациона права")
         st.dataframe(df_c_over_cis)
 
-        # 2. Примени ги регресиите на бланкови и семплови
-        all_samples = []
+       # 2. Примени ги регресиите на бланкови и семплови
+all_samples = []
 
-        if blank_file is not None:
-            df_blank = pd.read_excel(blank_file)
-            df_blank["Sample ID"] = "Blank"
-            all_samples.append(df_blank)
+if blank_file is not None:
+    df_blank = pd.read_excel(blank_file)
+    df_blank["Sample ID"] = "Blank"
+    all_samples.append(df_blank)
 
-        if sample_files:
-            for idx, f in enumerate(sample_files):
-                df_sample = pd.read_excel(f)
-                df_sample["Sample ID"] = f"Sample_{idx+1}"
-                all_samples.append(df_sample)
+if sample_files:
+    for idx, f in enumerate(sample_files):
+        df_sample = pd.read_excel(f)
+        df_sample["Sample ID"] = f"Sample_{idx+1}"
+        all_samples.append(df_sample)
 
-        df_all_samples = pd.concat(all_samples, ignore_index=True)
+df_all_samples = pd.concat(all_samples, ignore_index=True)
 
-        blank_results = []
-        samples_results = []
+# ✅ Проверка и поправка на колоната "Name" во df_c_over_cis
+df_c_over_cis = pd.DataFrame(regression_results)
+if "Name" not in df_c_over_cis.columns:
+    possible_name_col = [col for col in df_c_over_cis.columns if "name" in col.lower()]
+    if possible_name_col:
+        df_c_over_cis = df_c_over_cis.rename(columns={possible_name_col[0]: "Name"})
+    else:
+        st.error("❌ df_c_over_cis нема колона со име 'Name' или слично.")
+        st.stop()
 
-        for sample_id in df_all_samples["Sample ID"].unique():
-            df_current = df_all_samples[df_all_samples["Sample ID"] == sample_id]
-            is_row = df_current[df_current[name_col] == is_name]
+blank_results = []
+samples_results = []
 
-            if is_row.empty:
-                st.warning(f"⚠️ IS '{is_name}' не е пронајден во {sample_id}.")
-                continue
+for sample_id in df_all_samples["Sample ID"].unique():
+    df_current = df_all_samples[df_all_samples["Sample ID"] == sample_id]
+    is_row = df_current[df_current[name_col] == is_name]
 
-            is_height_sample = is_row[height_col_base].values[0]
-            if pd.isna(is_height_sample) or is_height_sample == 0:
-                st.warning(f"⚠️ Висината за IS во {sample_id} не е валидна.")
-                continue
+    if is_row.empty:
+        st.warning(f"⚠️ IS '{is_name}' не е пронајден во {sample_id}.")
+        continue
 
-            for _, analyte_row in df_current.iterrows():
-                compound_name = analyte_row[name_col]
-                if compound_name == is_name:
-                    continue
+    is_height_sample = is_row[height_col_base].values[0]
+    if pd.isna(is_height_sample) or is_height_sample == 0:
+        st.warning(f"⚠️ Висината за IS во {sample_id} не е валидна.")
+        continue
 
-                analyte_height = analyte_row[height_col_base]
-                if pd.isna(analyte_height):
-                    continue
+    for _, analyte_row in df_current.iterrows():
+        compound_name = analyte_row[name_col]
+        if compound_name == is_name:
+            continue
 
-                hx_over_his = analyte_height / is_height_sample
-                row_reg = df_c_over_cis[df_c_over_cis["Name"] == compound_name]
+        analyte_height = analyte_row[height_col_base]
+        if pd.isna(analyte_height):
+            continue
 
-                if row_reg.empty:
-                    continue
+        hx_over_his = analyte_height / is_height_sample
+        row_reg = df_c_over_cis[df_c_over_cis["Name"] == compound_name]
 
-                slope = float(row_reg["c(X)/c(IS)"].values[0])
-                intercept = float(row_reg["Intercept"].values[0])
+        if row_reg.empty:
+            continue
 
-                cx_over_cis = (hx_over_his - intercept) / slope
-                cx = cx_over_cis * c_is_extract
-                final_amt = cx * v_extract
+        slope = float(row_reg["c(X)/c(IS)"].values[0])
+        intercept = float(row_reg["Intercept"].values[0])
 
-                row_result = {
-                    "Name": compound_name,
-                    "H(X)/H(IS)": hx_over_his,
-                    "C(X)/C(IS)": cx_over_cis,
-                    "C(X)": cx,
-                    "Final Amount": final_amt
-                }
+        cx_over_cis = (hx_over_his - intercept) / slope
+        cx = cx_over_cis * c_is_extract
+        final_amt = cx * v_extract
 
-                if sample_id == "Blank":
-                    blank_results.append(row_result)
-                else:
-                    row_result["Sample ID"] = sample_id
-                    samples_results.append(row_result)
+        row_result = {
+            "Name": compound_name,
+            "H(X)/H(IS)": hx_over_his,
+            "C(X)/C(IS)": cx_over_cis,
+            "C(X)": cx,
+            "Final Amount": final_amt
+        }
 
-        df_blank_results = pd.DataFrame(blank_results)
-        df_samples_results = pd.DataFrame(samples_results)
+        if sample_id == "Blank":
+            blank_results.append(row_result)
+        else:
+            row_result["Sample ID"] = sample_id
+            samples_results.append(row_result)
 
-        if df_blank_results.empty or df_samples_results.empty:
-            st.warning("DataFrames се празни, проверете влезните податоци.")
-    
-        st.markdown("### Внатрешна калибрациона - Blank")
-        st.dataframe(df_blank_results)
+df_blank_results = pd.DataFrame(blank_results)
+df_samples_results = pd.DataFrame(samples_results)
 
-        st.markdown("### Внатрешна калибрациона - Samples")
-        st.dataframe(df_samples_results)
+if df_blank_results.empty or df_samples_results.empty:
+    st.warning("DataFrames се празни, проверете влезните податоци.")
+
+st.markdown("### Внатрешна калибрациона - Blank")
+st.dataframe(df_blank_results)
+
+st.markdown("### Внатрешна калибрациона - Samples")
+st.dataframe(df_samples_results)
 
         
 
