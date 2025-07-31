@@ -442,31 +442,36 @@ if method_internal_curve and result_df is not None and std_concentrations:
     std_conc_norm = np.array(std_concentrations) / std_concentrations[0]
     std_conc_norm = std_conc_norm.reshape(-1, 1)
 
-   # Подготви ratio_df = H(X)/H(IS) за секој стандард
-ratio_df = result_df[["Name"]].copy()
+  # Подготви ratio_df = H(X)/H(IS) за секој стандард
+if "Name" not in result_df.columns:
+    st.error("❌ Во резултатите недостасува колоната 'Name'. Проверете ги влезните Excel фајлови.")
+    st.stop()
 
+ratio_df = result_df[["Name"]].copy()
 height_cols = [col for col in result_df.columns if col.startswith("Height_")]
 
-for i, col in enumerate(height_cols):
-    if i >= len(std_dataframes):
-        st.warning(f"⚠️ Недостига стандард за колоната {col}")
-        ratio_df[f"Ratio_{i+1}"] = np.nan
+for i, df_std in enumerate(std_dataframes):
+    df_is = df_std[df_std[name_col] == is_name]
+    if df_is.empty:
+        st.warning(f"⚠️ IS '{is_name}' не е пронајден во стандардот {i+1}.")
         continue
 
-    df_std = std_dataframes[i]
-    is_row = df_std[df_std[name_col] == is_name]
+    is_height = df_is[height_col_base].values[0]
+    if pd.isna(is_height) or is_height == 0:
+        st.warning(f"⚠️ Висината за IS ({is_name}) во стандардот {i+1} не е валидна.")
+        continue
 
-    if not is_row.empty:
-        is_height = is_row[height_col_base].values[0]
+    for col in height_cols:
+        compound = col.split("_")[-1]
+        if f"Ratio_{compound}" not in ratio_df.columns:
+            ratio_df[f"Ratio_{compound}"] = np.nan
 
-        if pd.notna(is_height) and is_height != 0:
-            ratio_df[f"Ratio_{i+1}"] = result_df[col] / is_height
-        else:
-            st.warning(f"⚠️ IS висината за стандард {i+1} не е валидна: {is_height}")
-            ratio_df[f"Ratio_{i+1}"] = np.nan
-    else:
-        st.warning(f"⚠️ IS '{is_name}' не е пронајден во стандард {i+1}.")
-        ratio_df[f"Ratio_{i+1}"] = np.nan
+        ratio_df.loc[i, f"Ratio_{compound}"] = result_df.loc[i, col] / is_height
+
+if ratio_df.isnull().all().all():
+    st.error("❌ Нема пресметани Ratio вредности. Проверете дали висините се валидни.")
+    st.stop()
+
 
     # Ако успешно се пресметани односите, продолжи со регресија
     if ratio_df is not None:
