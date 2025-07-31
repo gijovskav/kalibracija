@@ -56,7 +56,7 @@ if method_internal_curve or method_external_curve or (method_one_point and (meth
 
 
     # Барање број на стандарди само еднаш
-    num_standards = st.number_input("Колку стандарди ќе користите? ", min_value=1, max_value=20, value=5, step=1)
+    num_standards = st.number_input("Колку стандарди ќе користите? Ако користите метода на калибрациона права со внатрешен стандард прв ставете го референтниот стандард", min_value=1, max_value=20, value=5, step=1)
 
     uploaded_std_files = []
     std_concentrations = []
@@ -429,224 +429,197 @@ if method_external_curve and 'result_df' in locals() and result_df is not None a
 
 
 #INTERNA
-import io
-import pandas as pd
+# Осигурај се дека result_df и std_concentrations се дефинирани
+if 'result_df' not in locals():
+    result_df = None
+if 'std_concentrations' not in locals():
+    std_concentrations = []
 
-# --- ВНАТРЕШНА КАЛИБРАЦИЈА (INTERNA KALIBRACIJA) ---
+# Внатрешна калибрација со крива - извршување само ако се вклучи оваа опција
+if method_internal_curve and result_df is not None and std_concentrations:
 
-if ('df_blank_results' in locals() and df_blank_results is not None and
-    not df_blank_results.empty and "Name" in df_blank_results.columns and
-    'df_samples_results' in locals() and df_samples_results is not None and
-    not df_samples_results.empty and "Name" in df_samples_results.columns and
-    "Sample ID" in df_samples_results.columns):
+    # 1. Пресметај C(X)/C(IS) регресија базирана на H(X)/H(IS)
+    std_conc_norm = np.array(std_concentrations) / std_concentrations[0]
+    std_conc_norm = std_conc_norm.reshape(-1, 1)
 
-    # Збир на уникатни Sample ID
-    sample_ids = df_samples_results["Sample ID"].unique()
+    # Подготви ratio_df = H(X)/H(IS) за секој стандард
+    ratio_df = result_df[["Name"]].copy()
+    df_std_first = std_dataframes[0]
+    is_row = df_std_first[df_std_first[name_col] == is_name]
 
-    # Одделни DataFrame-и по соединение (Name) за blank и samples
-    blank_tables = {}
-    samples_tables = {}
+    if not is_row.empty:
+        is_height = is_row[height_col_base].values[0]
 
-    for name in df_blank_results["Name"].unique():
-        blank_tables[name] = df_blank_results[df_blank_results["Name"] == name][["Name", "Final Amount"]].copy()
+        if pd.notna(is_height) and is_height != 0:
+            height_cols = [col for col in result_df.columns if col.startswith("Height_")]
+            for col in height_cols:
+                ratio_df[f"Ratio_{col.split('_')[-1]}"] = result_df[col] / is_height
+        else:
+            st.warning(f"⚠️ Висината за IS ({is_name}) не е валидна: {is_height}")
+            ratio_df = None
+    else:
+        st.warning(f"⚠️ IS '{is_name}' не е пронајден во првиот стандард.")
+        ratio_df = None
 
-    for sid in sample_ids:
-        df_sid = df_samples_results[df_samples_results["Sample ID"] == sid]
-        for name in df_sid["Name"].unique():
-            key = f"{sid} - {name}"
-            samples_tables[key] = df_sid[df_sid["Name"] == name][["Sample ID", "Name", "Final Amount"]].copy()
+    # Ако успешно се пресметани односите, продолжи со регресија
+    if ratio_df is not None:
+        regression_results = []
 
-    # --- Прикажи во Streamlit одделно по таблици ---
+        for idx, row in ratio_df.iterrows():
+            name = row["Name"]
+            ratios = [row.get(f"Ratio_{i+1}", np.nan) for i in range(len(std_concentrations))]
 
-    st.markdown("## Внатрешна калибрација - Blank по соединение")
-    for name, df_blank_sub in blank_tables.items():
-        st.markdown(f"### {name} - Blank")
-        st.dataframe(df_blank_sub)
+            if pd.isna(ratios).any():
+                continue
 
-    st.markdown("## Внатрешна калибрација - Samples по Sample ID и соединение")
-    for key, df_sample_sub in samples_tables.items():
-        st.markdown(f"### {key} - Samples")
-        st.dataframe(df_sample_sub)
+            y_vals = np.array(ratios).reshape(-1, 1)
+            model = LinearRegression()
+            model.fit(std_conc_norm, y_vals)
 
-    # --- Генерирање сумарна табела ---
+            slope = float(model.coef_)
+            intercept = float(model.intercept_)
+            correl = float(np.corrcoef(std_conc_norm.flatten(), y_vals.flatten())[0, 1])
 
-    summary_internal = {}
-    all_names_internal = set()
+            regression_results.append({
+                "Name": name,
+                "H(X)/H(IS)": "; ".join([f"{r:.3f}" for r in ratios]),
+                "c(X)/c(IS)": f"{slope:.6f}",
+                "Intercept": f"{intercept:.6f}",
+                "Correlation": f"{correl:.4f}"
+            })
 
-    # Blank суми
-    for name, df_blank_sub in blank_tables.items():
-        all_names_internal.add(name)
-        summary_internal.setdefault(name, {})["Blank (Метод 3)"] = df_blank_sub["Final Amount"].sum()
+        df_c_over_cis = pd.DataFrame(regression_results)
+        st.markdown("### Внатрешна калибрациона права")
+        st.dataframe(df_c_over_cis)
 
-    # Samples суми
-    for key, df_sample_sub in samples_tables.items():
-        sid, name = key.split(" - ", 1)
-        all_names_internal.add(name)
-        summary_internal.setdefault(name, {})[f"{sid} (Метод 3)"] = df_sample_sub["Final Amount"].sum()
+        # 2. Примени ги регресиите на бланкови и семплови
+        all_samples = []
 
-    final_summary_internal_rows = []
-    for name in sorted(all_names_internal):
-        row = {"Name": name}
-        row.update(summary_internal.get(name, {}))
-        final_summary_internal_rows.append(row)
+        if blank_file is not None:
+            df_blank = pd.read_excel(blank_file)
+            df_blank["Sample ID"] = "Blank"
+            all_samples.append(df_blank)
 
-    df_internal_summary = pd.DataFrame(final_summary_internal_rows).fillna(0)
+        if sample_files:
+            for idx, f in enumerate(sample_files):
+                df_sample = pd.read_excel(f)
+                df_sample["Sample ID"] = f"Sample_{idx+1}"
+                all_samples.append(df_sample)
 
-    st.markdown("## Внатрешна калибрација - Сумарна табела")
-    st.dataframe(df_internal_summary)
+        df_all_samples = pd.concat(all_samples, ignore_index=True)
 
-    # --- Excel извези: Прво одделните табли за blank и samples (во еден Excel со повеќе листови) ---
+        blank_results = []
+        samples_results = []
 
-    output_excel_internal = io.BytesIO()
-    with pd.ExcelWriter(output_excel_internal, engine="openpyxl") as writer:
-        # Blank листови, секој соединение поединечно
-        for name, df_blank_sub in blank_tables.items():
-            safe_name = name[:30]  # лимит за име на sheet во Excel
-            df_blank_sub.to_excel(writer, sheet_name=f"Blank_{safe_name}", index=False)
-        # Samples листови
-        for key, df_sample_sub in samples_tables.items():
-            safe_name = key[:30]
-            df_sample_sub.to_excel(writer, sheet_name=f"Sample_{safe_name}", index=False)
-        # Финална сумарна табела
-        df_internal_summary.to_excel(writer, sheet_name="Сумарна Внатрешна", index=False)
+        for sample_id in df_all_samples["Sample ID"].unique():
+            df_current = df_all_samples[df_all_samples["Sample ID"] == sample_id]
+            is_row = df_current[df_current[name_col] == is_name]
 
-    output_excel_internal.seek(0)
+            if is_row.empty:
+                st.warning(f"⚠️ IS '{is_name}' не е пронајден во {sample_id}.")
+                continue
 
-    st.download_button(
-        label="⬇️ Преземи Excel - Внатрешна калибрација (одделно и суми)",
-        data=output_excel_internal.getvalue(),
-        file_name="vnatresna_kalibracija.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    )
+            is_height_sample = is_row[height_col_base].values[0]
+            if pd.isna(is_height_sample) or is_height_sample == 0:
+                st.warning(f"⚠️ Висината за IS во {sample_id} не е валидна.")
+                continue
 
+            for _, analyte_row in df_current.iterrows():
+                compound_name = analyte_row[name_col]
+                if compound_name == is_name:
+                    continue
+
+                analyte_height = analyte_row[height_col_base]
+                if pd.isna(analyte_height):
+                    continue
+
+                hx_over_his = analyte_height / is_height_sample
+                row_reg = df_c_over_cis[df_c_over_cis["Name"] == compound_name]
+
+                if row_reg.empty:
+                    continue
+
+                slope = float(row_reg["c(X)/c(IS)"].values[0])
+                intercept = float(row_reg["Intercept"].values[0])
+
+                cx_over_cis = (hx_over_his - intercept) / slope
+                cx = cx_over_cis * c_is_extract
+                final_amt = cx * v_extract
+
+                row_result = {
+                    "Name": compound_name,
+                    "H(X)/H(IS)": hx_over_his,
+                    "C(X)/C(IS)": cx_over_cis,
+                    "C(X)": cx,
+                    "Final Amount": final_amt
+                }
+
+                if sample_id == "Blank":
+                    blank_results.append(row_result)
+                else:
+                    row_result["Sample ID"] = sample_id
+                    samples_results.append(row_result)
+
+        df_blank_results = pd.DataFrame(blank_results)
+        df_samples_results = pd.DataFrame(samples_results)
+
+        if df_blank_results.empty or df_samples_results.empty:
+            st.warning("DataFrames се празни, проверете влезните податоци.")
+    
+        st.markdown("### Внатрешна калибрациона - Blank")
+        st.dataframe(df_blank_results)
+
+        st.markdown("### Внатрешна калибрациона - Samples")
+        st.dataframe(df_samples_results)
+
+        
+
+        # Сумирана табела: секој sample посебна колона
+# Заштита од празни или невалидни DataFrame-и
+if df_blank_results.empty or df_samples_results.empty:
+    st.warning("Blank или Sample резултатите се празни - прикачи фајлови.")
 else:
-    st.warning("❌ Внатрешната калибрација не е достапна или не ги содржи потребните колони 'Name' и 'Sample ID'.")
-
-
-
-
-
-# --- КОМПАРАТИВНА СУМАРНА ТАБЕЛА ЗА СИТЕ МЕТОДИ ---
-summary_all_methods = {}
-all_names = set()
-
-# 1. Метод: Една точка
-if 'df_blank_processed' in locals() and df_blank_processed is not None:
-    for name in df_blank_processed["Name"].unique():
-        all_names.add(name)
-        summary_all_methods.setdefault(name, {})["Blank (Метод 1)"] = df_blank_processed[df_blank_processed["Name"] == name]["Маса (ng)"].sum()
-    for i, df_sample in enumerate(sample_tables):
-        for name in df_sample["Name"].unique():
-            all_names.add(name)
-            summary_all_methods.setdefault(name, {})[f"Sample {i+1} (Метод 1)"] = df_sample[df_sample["Name"] == name]["Маса (ng)"].sum()
-
-# 2. Метод: Класична калибрација
-if 'blank_final' in locals() and blank_final is not None:
-    for name in blank_final["Name"].unique():
-        all_names.add(name)
-        summary_all_methods.setdefault(name, {})["Blank (Метод 2)"] = blank_final[blank_final["Name"] == name]["m(X) / ng"].sum()
-    for i, df_sample in enumerate(samples_final):
-        for name in df_sample["Name"].unique():
-            all_names.add(name)
-            summary_all_methods.setdefault(name, {})[f"Sample {i+1} (Метод 2)"] = df_sample[df_sample["Name"] == name]["m(X) / ng"].sum()
-
-# 3. Метод: Внатрешна калибрација
-if 'df_blank_results' in locals() and not df_blank_results.empty and 'df_samples_results' in locals() and not df_samples_results.empty:
     if "Name" in df_blank_results.columns and "Name" in df_samples_results.columns:
+        all_names = set(df_blank_results["Name"].unique()) | set(df_samples_results["Name"].unique())
         sample_ids = df_samples_results["Sample ID"].unique()
-        for name in df_blank_results["Name"].unique():
-            all_names.add(name)
-            summary_all_methods.setdefault(name, {})["Blank (Метод 3)"] = df_blank_results[df_blank_results["Name"] == name]["Final Amount"].sum()
-        for sid in sample_ids:
-            df_sid = df_samples_results[df_samples_results["Sample ID"] == sid]
-            for name in df_sid["Name"].unique():
-                all_names.add(name)
-                value = df_sid[df_sid["Name"] == name]["Final Amount"].sum()
-                summary_all_methods.setdefault(name, {})[f"{sid} (Метод 3)"] = value
 
-# --- КОМПАРАТИВНА СУМАРНА ТАБЕЛА ЗА СИТЕ МЕТОДИ ---
-summary_all_methods = {}
-all_names = set()
+        summary_rows = []
 
-# 1. Метод: Една точка
-if 'df_blank_processed' in locals() and df_blank_processed is not None:
-    for name in df_blank_processed["Name"].unique():
-        all_names.add(name)
-        summary_all_methods.setdefault(name, {})["Blank (Метод 1)"] = df_blank_processed[df_blank_processed["Name"] == name]["Маса (ng)"].sum()
-    for i, df_sample in enumerate(sample_tables):
-        for name in df_sample["Name"].unique():
-            all_names.add(name)
-            summary_all_methods.setdefault(name, {})[f"Sample {i+1} (Метод 1)"] = df_sample[df_sample["Name"] == name]["Маса (ng)"].sum()
+        for name in sorted(all_names):
+            row = {"Name": name}
 
-# 2. Метод: Класична калибрација
-if 'blank_final' in locals() and blank_final is not None:
-    for name in blank_final["Name"].unique():
-        all_names.add(name)
-        summary_all_methods.setdefault(name, {})["Blank (Метод 2)"] = blank_final[blank_final["Name"] == name]["m(X) / ng"].sum()
-    for i, df_sample in enumerate(samples_final):
-        for name in df_sample["Name"].unique():
-            all_names.add(name)
-            summary_all_methods.setdefault(name, {})[f"Sample {i+1} (Метод 2)"] = df_sample[df_sample["Name"] == name]["m(X) / ng"].sum()
+            # Blank
+            blank_mass = df_blank_results[df_blank_results["Name"] == name]["Final Amount"].sum()
+            row["Blank"] = blank_mass
 
-# 3. Метод: Внатрешна калибрација
-if 'df_blank_results' in locals() and not df_blank_results.empty and 'df_samples_results' in locals() and not df_samples_results.empty:
-    if "Name" in df_blank_results.columns and "Name" in df_samples_results.columns:
-        sample_ids = df_samples_results["Sample ID"].unique()
-        for name in df_blank_results["Name"].unique():
-            all_names.add(name)
-            summary_all_methods.setdefault(name, {})["Blank (Метод 3)"] = df_blank_results[df_blank_results["Name"] == name]["Final Amount"].sum()
-        for sid in sample_ids:
-            df_sid = df_samples_results[df_samples_results["Sample ID"] == sid]
-            for name in df_sid["Name"].unique():
-                all_names.add(name)
-                value = df_sid[df_sid["Name"] == name]["Final Amount"].sum()
-                summary_all_methods.setdefault(name, {})[f"{sid} (Метод 3)"] = value
+            # Секој sample
+            for sid in sample_ids:
+                val = df_samples_results[
+                    (df_samples_results["Name"] == name) & 
+                    (df_samples_results["Sample ID"] == sid)
+                ]["Final Amount"].sum()
+                row[sid] = val
 
-# --- Формирање финална табела ---
-final_summary_rows = []
-for name in sorted(all_names):
-    row = {"Name": name}
-    row.update(summary_all_methods.get(name, {}))
-    final_summary_rows.append(row)
+            summary_rows.append(row)
 
-df_comparative_summary = pd.DataFrame(final_summary_rows)
-df_comparative_summary = df_comparative_summary.fillna(0)
+        df_summary = pd.DataFrame(summary_rows)
 
-# --- Прикажи во Streamlit ---
-st.markdown("## 📊 Компаративна табела од сите методи")
-st.dataframe(df_comparative_summary)
+        st.markdown("### Внатрешна калибрациона - сумирано")
+        st.dataframe(df_summary)
 
-# --- Преземање како Excel ---
-excel_bytes = BytesIO()
-with pd.ExcelWriter(excel_bytes, engine="xlsxwriter") as writer:
-    df_comparative_summary.to_excel(writer, index=False, sheet_name="Сумирана компарација")
-st.download_button("⬇️ Преземи компаративна табела (Excel)", data=excel_bytes.getvalue(), file_name="komparacija_metodi.xlsx")
+        # Генерирај Excel
+        output_excel = io.BytesIO()
+        with pd.ExcelWriter(output_excel, engine="openpyxl") as writer:
+            df_blank_results.to_excel(writer, sheet_name="Blank", index=False)
+            df_samples_results.to_excel(writer, sheet_name="Samples", index=False)
+            df_summary.to_excel(writer, sheet_name="Summary", index=False)
+        output_excel.seek(0)
 
-
-
-# --- СУМАРНА ТАБЕЛА СО ОДЗЕМЕН BLANK ---
-summary_corrected = df_comparative_summary.copy()
-
-# За секој ред (Name)
-for index, row in summary_corrected.iterrows():
-    for col in summary_corrected.columns:
-        if col.startswith("Sample"):
-            # Најди соодветен Blank за истиот метод
-            method_id = col.split("(")[-1].strip(")")
-            blank_col = f"Blank ({method_id})"
-            if blank_col in summary_corrected.columns:
-                corrected_value = row[col] - row[blank_col]
-                summary_corrected.at[index, col] = max(corrected_value, 0)  # избегни негативни
-
-# Прикажи табелата
-st.markdown("## 📉 Сумарна табела со одземен Blank")
-st.dataframe(summary_corrected)
-
-# Преземање како Excel
-excel_corrected = BytesIO()
-with pd.ExcelWriter(excel_corrected, engine="xlsxwriter") as writer:
-    summary_corrected.to_excel(writer, index=False, sheet_name="Одземен Blank")
-st.download_button("⬇️ Преземи табела со одземен Blank (Excel)", data=excel_corrected.getvalue(), file_name="komparacija_minus_blank.xlsx")
-
-
-
+        st.download_button(
+            label="💾 Симни резултати - внатрешна калибрациона",
+            data=output_excel.getvalue(),
+            file_name="vnatresna_kalibraciona.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+    else:
+        st.error("❌ Недостасува колоната 'Name' во некој од резултатите.")
