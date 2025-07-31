@@ -429,10 +429,16 @@ if method_external_curve and 'result_df' in locals() and result_df is not None a
 
 
 #INTERNA
-# INTERNA
-# Внатрешна калибрација со крива - извршување само ако се вклучи оваа опција
-if method_internal_curve and result_df is in locals() and result_df is not None and std_concentrations:
+#INTERNA
+# Осигурај се дека result_df и std_concentrations се дефинирани
+if 'result_df' not in locals():
+    result_df = None
+if 'std_concentrations' not in locals():
+    std_concentrations = []
 
+# Внатрешна калибрација со крива - извршување само ако се вклучи оваа опција
+if method_internal_curve and result_df is not None and std_concentrations:
+    
     # 1. Пресметај C(X)/C(IS) регресија базирана на H(X)/H(IS)
     std_conc_norm = np.array(std_concentrations) / std_concentrations[0]
     std_conc_norm = std_conc_norm.reshape(-1, 1)
