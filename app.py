@@ -429,222 +429,98 @@ if method_external_curve and 'result_df' in locals() and result_df is not None a
 
 
 #INTERNA
-#INTERNA
-# Осигурај се дека result_df и std_concentrations се дефинирани
-if 'result_df' not in locals():
-    result_df = None
-if 'std_concentrations' not in locals():
-    std_concentrations = []
+import io
+import pandas as pd
 
-# Внатрешна калибрација со крива - извршување само ако се вклучи оваа опција
-if method_internal_curve and result_df is not None and std_concentrations:
-    
-    # 1. Пресметај C(X)/C(IS) регресија базирана на H(X)/H(IS)
-    std_conc_norm = np.array(std_concentrations) / std_concentrations[0]
-    std_conc_norm = std_conc_norm.reshape(-1, 1)
+# --- ВНАТРЕШНА КАЛИБРАЦИЈА (INTERNA KALIBRACIJA) ---
 
-    # Подготви ratio_df = H(X)/H(IS) за секој стандард
-    if "Name" not in result_df.columns:
-        st.error("❌ Во резултатите недостасува колоната 'Name'. Проверете ги влезните Excel фајлови.")
-        st.stop()
+if ('df_blank_results' in locals() and df_blank_results is not None and
+    not df_blank_results.empty and "Name" in df_blank_results.columns and
+    'df_samples_results' in locals() and df_samples_results is not None and
+    not df_samples_results.empty and "Name" in df_samples_results.columns and
+    "Sample ID" in df_samples_results.columns):
 
-    ratio_df = result_df[["Name"]].copy()
+    # Збир на уникатни Sample ID
+    sample_ids = df_samples_results["Sample ID"].unique()
 
-    for i, df_std in enumerate(std_dataframes):
-        df_is = df_std[df_std[name_col] == is_name]
-        if df_is.empty:
-            st.warning(f"⚠️ IS '{is_name}' не е пронајден во стандардот {i+1}.")
-            continue
+    # Одделни DataFrame-и по соединение (Name) за blank и samples
+    blank_tables = {}
+    samples_tables = {}
 
-        is_height = df_is[height_col_base].values[0]
-        if pd.isna(is_height) or is_height == 0:
-            st.warning(f"⚠️ Висината за IS ({is_name}) во стандардот {i+1} не е валидна.")
-            continue
+    for name in df_blank_results["Name"].unique():
+        blank_tables[name] = df_blank_results[df_blank_results["Name"] == name][["Name", "Final Amount"]].copy()
 
-        for j, row_name in enumerate(result_df["Name"]):
-            if row_name not in df_std[name_col].values:
-                continue
-            compound_height = df_std.loc[df_std[name_col] == row_name, height_col_base].values[0]
+    for sid in sample_ids:
+        df_sid = df_samples_results[df_samples_results["Sample ID"] == sid]
+        for name in df_sid["Name"].unique():
+            key = f"{sid} - {name}"
+            samples_tables[key] = df_sid[df_sid["Name"] == name][["Sample ID", "Name", "Final Amount"]].copy()
 
-            ratio_col = f"Ratio_{i + 1}"
-            if ratio_col not in ratio_df.columns:
-                ratio_df[ratio_col] = np.nan
+    # --- Прикажи во Streamlit одделно по таблици ---
 
-            ratio_df.loc[j, ratio_col] = compound_height / is_height
+    st.markdown("## Внатрешна калибрација - Blank по соединение")
+    for name, df_blank_sub in blank_tables.items():
+        st.markdown(f"### {name} - Blank")
+        st.dataframe(df_blank_sub)
 
-    if ratio_df.isnull().all().all():
-        st.error("❌ Нема пресметани Ratio вредности. Проверете дали висините се валидни.")
-        st.stop()
+    st.markdown("## Внатрешна калибрација - Samples по Sample ID и соединение")
+    for key, df_sample_sub in samples_tables.items():
+        st.markdown(f"### {key} - Samples")
+        st.dataframe(df_sample_sub)
 
-    # Ако успешно се пресметани односите, продолжи со регресија
-    regression_results = []
+    # --- Генерирање сумарна табела ---
 
-    for idx, row in ratio_df.iterrows():
-        name = row["Name"]
-        ratios = [row.get(f"Ratio_{i+1}", np.nan) for i in range(len(std_concentrations))]
+    summary_internal = {}
+    all_names_internal = set()
 
-        if pd.isna(ratios).any():
-            continue
+    # Blank суми
+    for name, df_blank_sub in blank_tables.items():
+        all_names_internal.add(name)
+        summary_internal.setdefault(name, {})["Blank (Метод 3)"] = df_blank_sub["Final Amount"].sum()
 
-        y_vals = np.array(ratios).reshape(-1, 1)
-        model = LinearRegression()
-        model.fit(std_conc_norm, y_vals)
+    # Samples суми
+    for key, df_sample_sub in samples_tables.items():
+        sid, name = key.split(" - ", 1)
+        all_names_internal.add(name)
+        summary_internal.setdefault(name, {})[f"{sid} (Метод 3)"] = df_sample_sub["Final Amount"].sum()
 
-        slope = float(model.coef_)
-        intercept = float(model.intercept_)
-        correl = float(np.corrcoef(std_conc_norm.flatten(), y_vals.flatten())[0, 1])
+    final_summary_internal_rows = []
+    for name in sorted(all_names_internal):
+        row = {"Name": name}
+        row.update(summary_internal.get(name, {}))
+        final_summary_internal_rows.append(row)
 
-        regression_results.append({
-            "Name": name,
-            "H(X)/H(IS)": "; ".join([f"{r:.3f}" for r in ratios]),
-            "c(X)/c(IS)": f"{slope:.6f}",
-            "Intercept": f"{intercept:.6f}",
-            "Correlation": f"{correl:.4f}"
-        })
+    df_internal_summary = pd.DataFrame(final_summary_internal_rows).fillna(0)
 
-    df_c_over_cis = pd.DataFrame(regression_results)
-    st.markdown("### Внатрешна калибрациона права")
-    st.dataframe(df_c_over_cis)
+    st.markdown("## Внатрешна калибрација - Сумарна табела")
+    st.dataframe(df_internal_summary)
 
-    # 2. Примени ги регресиите на бланкови и семплови
-    all_samples = []
+    # --- Excel извези: Прво одделните табли за blank и samples (во еден Excel со повеќе листови) ---
 
-    if blank_file is not None:
-        df_blank = pd.read_excel(blank_file)
-        df_blank["Sample ID"] = "Blank"
-        all_samples.append(df_blank)
+    output_excel_internal = io.BytesIO()
+    with pd.ExcelWriter(output_excel_internal, engine="openpyxl") as writer:
+        # Blank листови, секој соединение поединечно
+        for name, df_blank_sub in blank_tables.items():
+            safe_name = name[:30]  # лимит за име на sheet во Excel
+            df_blank_sub.to_excel(writer, sheet_name=f"Blank_{safe_name}", index=False)
+        # Samples листови
+        for key, df_sample_sub in samples_tables.items():
+            safe_name = key[:30]
+            df_sample_sub.to_excel(writer, sheet_name=f"Sample_{safe_name}", index=False)
+        # Финална сумарна табела
+        df_internal_summary.to_excel(writer, sheet_name="Сумарна Внатрешна", index=False)
 
-    if sample_files:
-        for idx, f in enumerate(sample_files):
-            df_sample = pd.read_excel(f)
-            df_sample["Sample ID"] = f"Sample_{idx+1}"
-            all_samples.append(df_sample)
+    output_excel_internal.seek(0)
 
-    df_all_samples = pd.concat(all_samples, ignore_index=True)
+    st.download_button(
+        label="⬇️ Преземи Excel - Внатрешна калибрација (одделно и суми)",
+        data=output_excel_internal.getvalue(),
+        file_name="vnatresna_kalibracija.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
 
-    # ✅ Проверка и поправка на колоната "Name" во df_c_over_cis
-    df_c_over_cis = pd.DataFrame(regression_results)
-    if "Name" not in df_c_over_cis.columns:
-        possible_name_col = [col for col in df_c_over_cis.columns if "name" in col.lower()]
-        if possible_name_col:
-            df_c_over_cis = df_c_over_cis.rename(columns={possible_name_col[0]: "Name"})
-        else:
-            st.error("❌ df_c_over_cis нема колона со име 'Name' или слично.")
-            st.stop()
-
-    blank_results = []
-    samples_results = []
-
-    for sample_id in df_all_samples["Sample ID"].unique():
-        df_current = df_all_samples[df_all_samples["Sample ID"] == sample_id]
-        is_row = df_current[df_current[name_col] == is_name]
-
-        if is_row.empty:
-            st.warning(f"⚠️ IS '{is_name}' не е пронајден во {sample_id}.")
-            continue
-
-        is_height_sample = is_row[height_col_base].values[0]
-        if pd.isna(is_height_sample) or is_height_sample == 0:
-            st.warning(f"⚠️ Висината за IS во {sample_id} не е валидна.")
-            continue
-
-        for _, analyte_row in df_current.iterrows():
-            compound_name = analyte_row[name_col]
-            if compound_name == is_name:
-                continue
-
-            analyte_height = analyte_row[height_col_base]
-            if pd.isna(analyte_height):
-                continue
-
-            hx_over_his = analyte_height / is_height_sample
-            row_reg = df_c_over_cis[df_c_over_cis["Name"] == compound_name]
-
-            if row_reg.empty:
-                continue
-
-            slope = float(row_reg["c(X)/c(IS)"].values[0])
-            intercept = float(row_reg["Intercept"].values[0])
-
-            cx_over_cis = (hx_over_his - intercept) / slope
-            cx = cx_over_cis * c_is_extract
-            final_amt = cx * v_extract
-
-            row_result = {
-                "Name": compound_name,
-                "H(X)/H(IS)": hx_over_his,
-                "C(X)/C(IS)": cx_over_cis,
-                "C(X)": cx,
-                "Final Amount": final_amt
-            }
-
-            if sample_id == "Blank":
-                blank_results.append(row_result)
-            else:
-                row_result["Sample ID"] = sample_id
-                samples_results.append(row_result)
-
-    df_blank_results = pd.DataFrame(blank_results)
-    df_samples_results = pd.DataFrame(samples_results)
-
-    if df_blank_results.empty or df_samples_results.empty:
-        st.warning("DataFrames се празни, проверете влезните податоци.")
-
-    st.markdown("### Внатрешна калибрациона - Blank")
-    st.dataframe(df_blank_results)
-
-    st.markdown("### Внатрешна калибрациона - Samples")
-    st.dataframe(df_samples_results)
-
-    # Сумирана табела: секој sample посебна колона
-    # Заштита од празни или невалидни DataFrame-и
-    if df_blank_results.empty or df_samples_results.empty:
-        st.warning("Blank или Sample резултатите се празни - прикачи фајлови.")
-    else:
-        if "Name" in df_blank_results.columns and "Name" in df_samples_results.columns:
-            all_names = set(df_blank_results["Name"].unique()) | set(df_samples_results["Name"].unique())
-            sample_ids = df_samples_results["Sample ID"].unique()
-
-            summary_rows = []
-
-            for name in sorted(all_names):
-                row = {"Name": name}
-
-                # Blank
-                blank_mass = df_blank_results[df_blank_results["Name"] == name]["Final Amount"].sum()
-                row["Blank"] = blank_mass
-
-                # Секој sample
-                for sid in sample_ids:
-                    val = df_samples_results[
-                        (df_samples_results["Name"] == name) & 
-                        (df_samples_results["Sample ID"] == sid)
-                    ]["Final Amount"].sum()
-                    row[sid] = val
-
-                summary_rows.append(row)
-
-            df_summary = pd.DataFrame(summary_rows)
-
-            st.markdown("### Внатрешна калибрациона - сумирано")
-            st.dataframe(df_summary)
-
-            # Генерирај Excel
-            output_excel = io.BytesIO()
-            with pd.ExcelWriter(output_excel, engine="openpyxl") as writer:
-                df_blank_results.to_excel(writer, sheet_name="Blank", index=False)
-                df_samples_results.to_excel(writer, sheet_name="Samples", index=False)
-                df_summary.to_excel(writer, sheet_name="Summary", index=False)
-            output_excel.seek(0)
-
-            st.download_button(
-                label="💾 Симни резултати - внатрешна калибрациона",
-                data=output_excel.getvalue(),
-                file_name="vnatresna_kalibraciona.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            )
-        else:
-            st.error("❌ Недостасува колоната 'Name' во некој од DataFrame-ите.")
+else:
+    st.warning("❌ Внатрешната калибрација не е достапна или не ги содржи потребните колони 'Name' и 'Sample ID'.")
 
 
 
