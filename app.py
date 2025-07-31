@@ -427,25 +427,21 @@ if method_external_curve and 'result_df' in locals() and result_df is not None a
 
 
 
+
+#INTERNA
 if 'result_df' not in locals() or result_df is None:
     # Ако нема внесено податоци, или не е дефиниран, сѐ уште не прави ништо
     st.info("Чекам да се вчитаат податоци (result_df е празен).")
     st.stop()  # Ова го запира кодот тука додека не се вчитаат податоците
 
 # INTERNA - Внатрешна калибрација со крива - извршување само ако се вклучи оваа опција
-if method_internal_curve and result_df is not None and std_concentrations:
-
-    # Проверка дали result_df не е празен
-    if result_df.empty:
-        st.error("❌ Резултатите се празни.")
-        st.stop()
-
-    # Проверка дали 'Name' колона постои
-    if "Name" not in result_df.columns:
-        st.error("❌ Во резултатите недостасува колоната 'Name'. Проверете ги влезните Excel фајлови.")
-        st.stop()
-
-    # 1. Пресметај C(X)/C(IS) регресија базирана на H(X)/H(IS)
+if method_internal_curve:
+    if result_df is None:
+        st.warning("result_df не е дефиниран. Прикачи стандардни фајлови.")
+    elif "Name" not in result_df.columns:
+        st.warning("result_df нема колона 'Name'. Проверете ги фајловите.")
+    else:
+             # 1. Пресметај C(X)/C(IS) регресија базирана на H(X)/H(IS)
     std_conc_norm = np.array(std_concentrations) / std_concentrations[0]
     std_conc_norm = std_conc_norm.reshape(-1, 1)
 
