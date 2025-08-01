@@ -695,6 +695,9 @@ st.download_button(
 
 
 # --- СУМАРНА ТАБЕЛА СО ОДЗЕМЕН BLANK ---
+st.write("📋 Колони во df_blank_processed:", df_blank_processed.columns.tolist())
+st.write("📋 Колони во blank_final:", blank_final.columns.tolist())
+st.write("📋 Колони во df_blank_results:", df_blank_results.columns.tolist())
 summary_corrected = df_comparative_summary.copy()
 
 for index, row in summary_corrected.iterrows():
