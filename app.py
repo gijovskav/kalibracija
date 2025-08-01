@@ -623,10 +623,19 @@ if method_internal_curve and result_df is not None and std_concentrations:
                 )
             else:
                 st.error("❌ Недостасува колоната 'Name' во некој од резултатите.")
+                
 
 
 
-
+#krajna tabela
+# --- Безбедно земање имиња од стандард ---
+if method_one_point and not (method_internal_curve or method_external_curve):
+    std_names = df_std['Name'].dropna().astype(str).str.strip().str.lower().unique() \
+        if 'df_std' in locals() and isinstance(df_std, pd.DataFrame) else []
+else:
+    combined_std_df = pd.concat(std_dataframes, ignore_index=True) if std_dataframes else pd.DataFrame()
+    std_names = combined_std_df['Name'].dropna().astype(str).str.strip().str.lower().unique() \
+        if not combined_std_df.empty else []
 
 st.markdown("### Debug: Стандардни имиња")
 st.write(std_names)
@@ -645,16 +654,6 @@ if isinstance(df_summary_external, pd.DataFrame):
 
 
 
-
-#krajna tabela
-# --- Безбедно земање имиња од стандард ---
-if method_one_point and not (method_internal_curve or method_external_curve):
-    std_names = df_std['Name'].dropna().astype(str).str.strip().str.lower().unique() \
-        if 'df_std' in locals() and isinstance(df_std, pd.DataFrame) else []
-else:
-    combined_std_df = pd.concat(std_dataframes, ignore_index=True) if std_dataframes else pd.DataFrame()
-    std_names = combined_std_df['Name'].dropna().astype(str).str.strip().str.lower().unique() \
-        if not combined_std_df.empty else []
 
 # --- Почетна табела само со имињата од стандардот ---
 df_combined = pd.DataFrame({'Name': sorted(std_names)})
@@ -699,4 +698,5 @@ df_combined = df_combined.fillna(0)
 # --- Прикажи резултат ---
 st.markdown("### Комбинирана сумирана табела за сите методи и samples:")
 st.dataframe(df_combined)
+
 
