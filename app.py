@@ -629,29 +629,17 @@ if method_internal_curve and result_df is not None and std_concentrations:
 
 #krajna tabela
 # --- Безбедно земање имиња од стандард ---
+std_names = []
+
 if method_one_point and not (method_internal_curve or method_external_curve):
-    std_names = df_std['Name'].dropna().astype(str).str.strip().str.lower().unique() \
-        if 'df_std' in locals() and isinstance(df_std, pd.DataFrame) else []
+    if 'df_std' in locals() and isinstance(df_std, pd.DataFrame) and 'Name' in df_std.columns:
+        df_std['Name'] = df_std['Name'].astype(str).str.strip().str.lower()
+        std_names = df_std['Name'].dropna().unique().tolist()
 else:
     combined_std_df = pd.concat(std_dataframes, ignore_index=True) if std_dataframes else pd.DataFrame()
-    std_names = combined_std_df['Name'].dropna().astype(str).str.strip().str.lower().unique() \
-        if not combined_std_df.empty else []
-
-st.markdown("### Debug: Стандардни имиња")
-st.write(std_names)
-
-if isinstance(summary, pd.DataFrame):
-    st.markdown("### Debug: One Point `Name`")
-    st.write(summary['Name'].dropna().unique())
-
-if isinstance(df_summary, pd.DataFrame):
-    st.markdown("### Debug: Internal Curve `Name`")
-    st.write(df_summary['Name'].dropna().unique())
-
-if isinstance(df_summary_external, pd.DataFrame):
-    st.markdown("### Debug: External Curve `Name`")
-    st.write(df_summary_external['Name'].dropna().unique())
-
+    if not combined_std_df.empty and 'Name' in combined_std_df.columns:
+        combined_std_df['Name'] = combined_std_df['Name'].astype(str).str.strip().str.lower()
+        std_names = combined_std_df['Name'].dropna().unique().tolist()
 
 
 
@@ -698,5 +686,6 @@ df_combined = df_combined.fillna(0)
 # --- Прикажи резултат ---
 st.markdown("### Комбинирана сумирана табела за сите методи и samples:")
 st.dataframe(df_combined)
+
 
 
