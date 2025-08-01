@@ -481,16 +481,20 @@ for idx, col in enumerate(height_cols):
             correl = float(np.corrcoef(std_conc_norm.flatten(), y_vals.flatten())[0, 1])
 
             regression_results.append({
-                "Name": name,
-                "H(X)/H(IS)": "; ".join([f"{r:.3f}" for r in ratios]),
-                "c(X)/c(IS)": f"{slope:.6f}",
-                "Intercept": f"{intercept:.6f}",
-                "Correlation": f"{correl:.4f}"
-            })
+    "Name": name,
+    "H(X)/H(IS)": "; ".join([f"{r:.3f}" for r in ratios]),
+    "c(X)/c(IS)": f"{slope:.6f}",
+    "Intercept": f"{intercept:.6f}",
+    "Correlation": f"{correl:.4f}"
+})
 
-        df_c_over_cis = pd.DataFrame(regression_results)
-        st.markdown("### Внатрешна калибрациона права")
-        st.dataframe(df_c_over_cis)
+df_c_over_cis = pd.DataFrame(regression_results)
+st.write("df_c_over_cis columns:", df_c_over_cis.columns)
+st.write("df_c_over_cis preview:", df_c_over_cis.head())
+st.write("df_c_over_cis shape:", df_c_over_cis.shape)
+
+st.markdown("### Внатрешна калибрациона права")
+st.dataframe(df_c_over_cis)
 
         # 2. Примени ги регресиите на бланкови и семплови
         all_samples = []
