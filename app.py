@@ -443,8 +443,6 @@ if method_internal_curve and result_df is not None and std_concentrations:
     std_conc_norm = std_conc_norm.reshape(-1, 1)
 
    # Подготви ratio_df = H(X)/H(IS) за секој стандард
-ratio_df = result_df[["Name"]].copy()
-
 height_cols = [col for col in result_df.columns if col.startswith("Height_")]
 
 for i, col in enumerate(height_cols):
