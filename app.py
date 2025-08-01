@@ -696,31 +696,30 @@ st.dataframe(df_combined)
 # Копија од комбинираната табела
 df_corrected = df_combined.copy()
 
-# Имиња на колоните од методите (сите освен 'Name')
+# Сите методски колони (освен 'Name')
 method_columns = [col for col in df_corrected.columns if col != 'Name']
 
-# Детекција на blank редови (по име)
-is_blank_row = df_corrected['Name'].str.contains("blank|слепа", case=False, na=False)
-blank_rows = df_corrected[is_blank_row]
+# Детектирај кои редови се blanks (по име)
+blank_mask = df_corrected['Name'].str.contains("blank|слепа", case=False, na=False)
 
-# --- Собирање на blank вредности по метод ---
-blank_values = {}
+# Издвој ги blank редовите
+df_blanks = df_corrected[blank_mask]
+
+# Издвој ги редовите што НЕ се blanks
+df_samples = df_corrected[~blank_mask].copy()
+
+# Одземи за секој метод вредноста од blank
 for col in method_columns:
-    if not blank_rows.empty:
-        # Земаме просек ако има повеќе blank реда
-        blank_values[col] = blank_rows[col].mean()
+    if not df_blanks.empty:
+        blank_value = df_blanks[col].mean()  # ако има повеќе blank редови, земи просек
     else:
-        blank_values[col] = 0  # Ако нема blank, одземај 0 (нема корекција)
+        blank_value = 0  # ако нема blank, нема што да се одземе
 
-# --- Примена на корекцијата на секој sample ред (освен blank редови) ---
-non_blank_df = df_corrected[~is_blank_row].copy()
+    df_samples[col] = df_samples[col] - blank_value
 
-for col in method_columns:
-    non_blank_df[col] = non_blank_df[col] - blank_values[col]
+# Финалната табела со коригирани вредности и без слепи проби
+df_final = df_samples.reset_index(drop=True)
 
-# --- Финалната табела ---
-df_final = non_blank_df.reset_index(drop=True)
-
-# --- Прикажување ---
+# --- Прикажи ја табелата ---
 st.markdown("### Финална компаративна табела со одземени слепи проби:")
 st.dataframe(df_final)
