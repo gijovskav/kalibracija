@@ -634,44 +634,44 @@ all_names = set()
 
 # 1. Метод: Една точка
 if 'df_blank_processed' in locals() and df_blank_processed is not None:
-    for name in df_blank_processed["Analyte"].unique():
+    for name in df_blank_processed["Name"].unique():
         all_names.add(name)
-        summary_all_methods.setdefault(name, {})["Blank (Метод 1)"] = df_blank_processed[df_blank_processed["Analyte"] == name]["Total (ng)"].sum()
+        summary_all_methods.setdefault(name, {})["Blank (Метод 1)"] = df_blank_processed[df_blank_processed["Name"] == name]["Total (ng)"].sum()
     for i, df_sample in enumerate(sample_tables):
-        for name in df_sample["Analyte"].unique():
+        for name in df_sample["Name"].unique():
             all_names.add(name)
-            summary_all_methods.setdefault(name, {})[f"Sample {i+1} (Метод 1)"] = df_sample[df_sample["Analyte"] == name]["Total (ng)"].sum()
+            summary_all_methods.setdefault(name, {})[f"Sample {i+1} (Метод 1)"] = df_sample[df_sample["Name"] == name]["Total (ng)"].sum()
 
 # 2. Метод: Класична калибрација
 if 'blank_final' in locals() and blank_final is not None:
-    for name in blank_final["Analyte"].unique():
+    for name in blank_final["Name"].unique():
         all_names.add(name)
-        summary_all_methods.setdefault(name, {})["Blank (Метод 2)"] = blank_final[blank_final["Analyte"] == name]["Total (ng)"].sum()
+        summary_all_methods.setdefault(name, {})["Blank (Метод 2)"] = blank_final[blank_final["Name"] == name]["Total (ng)"].sum()
     for i, df_sample in enumerate(samples_final):
-        for name in df_sample["Analyte"].unique():
+        for name in df_sample["Name"].unique():
             all_names.add(name)
-            summary_all_methods.setdefault(name, {})[f"Sample {i+1} (Метод 2)"] = df_sample[df_sample["Analyte"] == name]["Total (ng)"].sum()
+            summary_all_methods.setdefault(name, {})[f"Sample {i+1} (Метод 2)"] = df_sample[df_sample["Name"] == name]["Total (ng)"].sum()
 
 # 3. Метод: Внатрешна калибрација
 if ('df_blank_results' in locals() and df_blank_results is not None and not df_blank_results.empty and
     'df_samples_results' in locals() and df_samples_results is not None and not df_samples_results.empty):
 
-    if "Analyte" in df_blank_results.columns and "Analyte" in df_samples_results.columns:
+    if "Name" in df_blank_results.columns and "Name" in df_samples_results.columns:
         sample_ids = df_samples_results["Sample ID"].unique()
-        for name in df_blank_results["Analyte"].unique():
+        for name in df_blank_results["Name"].unique():
             all_names.add(name)
-            summary_all_methods.setdefault(name, {})["Blank (Метод 3)"] = df_blank_results[df_blank_results["Analyte"] == name]["Total (ng)"].sum()
+            summary_all_methods.setdefault(name, {})["Blank (Метод 3)"] = df_blank_results[df_blank_results["Name"] == name]["Total (ng)"].sum()
         for sid in sample_ids:
             df_sid = df_samples_results[df_samples_results["Sample ID"] == sid]
-            for name in df_sid["Analyte"].unique():
+            for name in df_sid["Name"].unique():
                 all_names.add(name)
-                value = df_sid[df_sid["Analyte"] == name]["Total (ng)"].sum()
+                value = df_sid[df_sid["Name"] == name]["Total (ng)"].sum()
                 summary_all_methods.setdefault(name, {})[f"{sid} (Метод 3)"] = value
 
 # --- Формирање финална табела ---
 final_summary_rows = []
 for name in sorted(all_names):
-    row = {"Analyte": name}
+    row = {"Name": name}
     row.update(summary_all_methods.get(name, {}))
     final_summary_rows.append(row)
 
