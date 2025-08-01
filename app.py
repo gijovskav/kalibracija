@@ -644,16 +644,31 @@ else:
 
 
 # --- Почетна табела само со имињата од стандардот ---
+# --- Безбедно земање имиња од стандард ---
+std_names = []
+
+if method_one_point and not (method_internal_curve or method_external_curve):
+    if 'df_std' in locals() and isinstance(df_std, pd.DataFrame) and 'Name' in df_std.columns:
+        df_std['Name'] = df_std['Name'].astype(str).str.strip().str.lower()
+        std_names = df_std['Name'].dropna().unique().tolist()
+else:
+    combined_std_df = pd.concat(std_dataframes, ignore_index=True) if std_dataframes else pd.DataFrame()
+    if not combined_std_df.empty and 'Name' in combined_std_df.columns:
+        combined_std_df['Name'] = combined_std_df['Name'].astype(str).str.strip().str.lower()
+        std_names = combined_std_df['Name'].dropna().unique().tolist()
+
+# --- Почетна табела само со имињата од стандардот ---
 df_combined = pd.DataFrame({'Name': sorted(std_names)})
 
-# --- Проверка и подготовка на табелите од методите ---
-dfs_to_merge = []
-
+# --- Функција за нормализација на имињата ---
 def normalize_name_column(df):
     df = df.copy()
     if 'Name' in df.columns:
         df['Name'] = df['Name'].astype(str).str.strip().str.lower()
     return df
+
+# --- Подготовка на табелите за спојување ---
+dfs_to_merge = []
 
 # One Point Method
 summary = locals().get('summary')
@@ -662,30 +677,60 @@ if isinstance(summary, pd.DataFrame) and not summary.empty:
     df_1p = df_1p.rename(columns=lambda c: f"{c} (One Point)" if c != 'Name' else c)
     dfs_to_merge.append(df_1p)
 
-# Internal Curve
-df_summary = locals().get('df_summary')
-if isinstance(df_summary, pd.DataFrame) and not df_summary.empty:
-    df_internal = normalize_name_column(df_summary)
+# Internal Curve Method
+df_summary_internal = locals().get('df_summary')
+if isinstance(df_summary_internal, pd.DataFrame) and not df_summary_internal.empty:
+    df_internal = normalize_name_column(df_summary_internal)
     df_internal = df_internal.rename(columns=lambda c: f"{c} (Internal Curve)" if c != 'Name' else c)
     dfs_to_merge.append(df_internal)
 
-# External Curve
+# External Curve Method
 df_summary_external = locals().get('df_summary_external')
 if isinstance(df_summary_external, pd.DataFrame) and not df_summary_external.empty:
     df_external = normalize_name_column(df_summary_external)
     df_external = df_external.rename(columns=lambda c: f"{c} (External Curve)" if c != 'Name' else c)
     dfs_to_merge.append(df_external)
 
-# --- Спојување само според стандардните имиња ---
+# --- Спојување според 'Name' ---
 for df_method in dfs_to_merge:
     df_combined = df_combined.merge(df_method, on='Name', how='left')
 
-# --- Пополнување празни вредности со 0 ---
+# --- Пополнување со 0 ---
 df_combined = df_combined.fillna(0)
 
-# --- Прикажи резултат ---
+# --- Прикажи комбинована табела ---
 st.markdown("### Комбинирана сумирана табела за сите методи и samples:")
 st.dataframe(df_combined)
+
+# --- Одземање на blank вредности ---
+df_corrected = df_combined.copy()
+
+methods = ['One Point', 'Internal Curve', 'External Curve']
+
+for method in methods:
+    # Наоѓање на колоните за sample и blank за конкретниот метод
+    sample_cols = [col for col in df_corrected.columns if re.match(rf".*sample\s*\d+\s*\({method}\)", col, flags=re.IGNORECASE)]
+    blank_col = next((col for col in df_corrected.columns if re.match(rf".*blank.*\({method}\)", col, flags=re.IGNORECASE)), None)
+
+    if not blank_col:
+        # Ако нема blank колона за методот, прескокни го
+        continue
+
+    for sample_col in sample_cols:
+        match = re.search(r'sample\s*(\d+)', sample_col, flags=re.IGNORECASE)
+        if not match:
+            continue
+        sample_num = match.group(1)
+        new_col = f"Sample {sample_num} - Blank ({method})"
+        df_corrected[new_col] = df_corrected[sample_col] - df_corrected[blank_col]
+
+# --- Избор само на новите колони и 'Name' ---
+result_cols = ['Name'] + [col for col in df_corrected.columns if ' - Blank (' in col]
+df_final = df_corrected[result_cols].copy()
+
+# --- Прикажи финална табела ---
+st.markdown("### Финална компаративна табела со едноставно одземени blank вредности:")
+st.dataframe(df_final)
 
 
 
@@ -729,3 +774,4 @@ df_final = df_corrected[result_cols].copy()
 # --- Прикажи резултат ---
 st.markdown("### Финална компаративна табела со едноставно одземени blank вредности:")
 st.dataframe(df_final)
+
