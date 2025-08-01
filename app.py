@@ -628,47 +628,70 @@ if method_internal_curve and result_df is not None and std_concentrations:
 
 
 #krajna tabela
-# Проверка кои табели се достапни
-dfs_to_merge = []
-method_labels = []
+import pandas as pd
 
-if 'summary' in locals() and not summary.empty:  # One point method
-    df_1p = summary.copy()
-    df_1p = df_1p.rename(columns=lambda c: f"{c} (One Point)" if c != 'Name' else c)
-    dfs_to_merge.append(df_1p)
-    method_labels.append('One Point')
+# --- Функција за подготовка на податоци за еден метод ---
+def prepare_method_tables(blank_df, sample_dfs, method_label):
+    # Сумираме Blank податоци
+    df_blank = None
+    if blank_df is not None:
+        df_blank = blank_df[['Name', 'Маса (ng)']].copy()
+        df_blank.rename(columns={'Маса (ng)': f'Blank {method_label}'}, inplace=True)
+    
+    # Сумираме samples
+    sample_dfs_renamed = []
+    for i, df_sample in enumerate(sample_dfs):
+        df_sample_renamed = df_sample[['Name', 'Маса (ng)']].copy()
+        df_sample_renamed.rename(columns={'Маса (ng)': f'Sample {i+1} {method_label}'}, inplace=True)
+        sample_dfs_renamed.append(df_sample_renamed)
 
-if 'df_summary' in locals() and not df_summary.empty:
-    # Ова е за Внатрешна калибрациона, па да го препознаеме со label
-    df_internal = df_summary.copy()
-    df_internal = df_internal.rename(columns=lambda c: f"{c} (Internal Curve)" if c != 'Name' else c)
-    dfs_to_merge.append(df_internal)
-    method_labels.append('Internal Curve')
+    # Спајаме Blank и сите Sample табели на Name
+    dfs_to_merge = []
+    if df_blank is not None:
+        dfs_to_merge.append(df_blank)
+    dfs_to_merge.extend(sample_dfs_renamed)
+    
+    if not dfs_to_merge:
+        return None
 
-if 'df_summary_external' in locals() and not df_summary_external.empty:
-    # Надворешна калибрациона
-    df_external = df_summary_external.copy()
-    df_external = df_external.rename(columns=lambda c: f"{c} (External Curve)" if c != 'Name' else c)
-    dfs_to_merge.append(df_external)
-    method_labels.append('External Curve')
+    # Почнуваме од имњата
+    all_names = set()
+    for df in dfs_to_merge:
+        all_names.update(df['Name'].unique())
+    df_result = pd.DataFrame({'Name': sorted(all_names)})
 
-# Собираме уникатни имња од сите достапни табели
+    # Merge ги сите по Name
+    for df in dfs_to_merge:
+        df_result = df_result.merge(df, on='Name', how='left')
+
+    return df_result.fillna(0)
+
+# --- Пример како да се користи ---
+
+# За One Point метод
+df_one_point = prepare_method_tables(df_blank_one_point, sample_tables_one_point, 'One Point')
+
+# За Internal Curve метод
+df_internal = prepare_method_tables(df_blank_internal, sample_tables_internal, 'Internal Curve')
+
+# За External Curve метод
+df_external = prepare_method_tables(df_blank_external, sample_tables_external, 'External Curve')
+
+# --- Сега треба да ги споиме сите три заедно ---
+# Прво извадиме сите уникатни имиња од сите три
 all_names = set()
-for df in dfs_to_merge:
-    all_names.update(df['Name'].unique())
+for df in [df_one_point, df_internal, df_external]:
+    if df is not None:
+        all_names.update(df['Name'].unique())
 
 df_combined = pd.DataFrame({'Name': sorted(all_names)})
 
-# Спојување на сите табели по 'Name'
-for df_method in dfs_to_merge:
-    df_combined = df_combined.merge(df_method, on='Name', how='left')
+# Спојување на сите по име
+for df in [df_one_point, df_internal, df_external]:
+    if df is not None:
+        df_combined = df_combined.merge(df, on='Name', how='left')
 
-# Пополнуваме NaN со 0 или со празно (според што ти треба)
 df_combined = df_combined.fillna(0)
 
-# Прикажи ја комбинираната табела
-st.markdown("### Комбинирана сумирана табела за сите методи и samples:")
+st.markdown("### Комбинирана табела - по метод и пример")
 st.dataframe(df_combined)
-
-
-
