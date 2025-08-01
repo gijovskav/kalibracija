@@ -175,9 +175,9 @@ else:
 
 
         # Пресметка на c(X)
-        df_sample['c(X) / µg L-1'] = df_sample.apply(lambda row: 
-            (row['Height (Hz)'] / height_is_sample) * (c_is_start / row['RRF']) 
-            if row['RRF'] else None, axis=1)
+    df_sample['c(X) / µg L-1'] = df_sample.apply(lambda row: 
+        (row['Height (Hz)'] / height_is_sample) * (c_is_start / row['RRF']) 
+        if row['RRF'] else None, axis=1)
 
         # Пресметка на маса во ng
         df_sample['Маса (ng)'] = df_sample['c(X) / µg L-1'] * v_extract
