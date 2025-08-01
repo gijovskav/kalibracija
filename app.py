@@ -159,15 +159,20 @@ if method_one_point:
         # Генерира реден број
         df_sample.insert(0, "Ред. бр.", range(1, len(df_sample) + 1))
 
-        # Наоѓање RRF од стандарди според Name
-        def get_rrf(name):
-            match = df_std[df_std['Name'] == name]
-            if not match.empty:
-                return match['RRF'].values[0]
-            else:
-                return None
+      # Безбедно наоѓање RRF од стандарди според Name
+if df_std is not None and not df_std.empty and 'Name' in df_std.columns and 'RRF' in df_std.columns:
+    def get_rrf(name):
+        match = df_std[df_std['Name'] == name]
+        if not match.empty:
+            return match['RRF'].values[0]
+        else:
+            return None
 
-        df_sample['RRF'] = df_sample['Name'].apply(get_rrf)
+    df_sample['RRF'] = df_sample['Name'].apply(get_rrf)
+else:
+    st.info("ℹ️ Стандардните податоци не се валидни или недостасуваат колони 'Name' и 'RRF'.")
+    df_sample['RRF'] = None
+
 
         # Пресметка на c(X)
         df_sample['c(X) / µg L-1'] = df_sample.apply(lambda row: 
@@ -180,9 +185,19 @@ if method_one_point:
         return df_sample[['Ред. бр.', 'Name', 'RT (min)', 'Height (Hz)', 'RRF', 'c(X) / µg L-1', 'Маса (ng)']]
 
     # --- Пример за blank обработка ---
-    if blank_file is not None:
-        blank_df = pd.read_excel(blank_file)
+   if blank_file is not None and std_dataframes and is_name:
+    blank_df = pd.read_excel(blank_file)
+    df_std = std_dataframes[0]  # или најди со иста концентрација ако сакаш
+    if not df_std.empty:
         df_blank_processed = process_sample(blank_df, df_std, c_is_start, v_extract, is_name)
+        if df_blank_processed is not None:
+            st.markdown("### Калибрација со една точка - Blank:")
+            st.dataframe(df_blank_processed)
+    else:
+        st.warning("⚠️ Стандардниот фајл е празен.")
+else:
+    st.info("📥 За да се пресмета blank, прикачи ги и стандардниот фајл и IS.")
+
         if df_blank_processed is not None:
             st.markdown("### Калибрација со една точка - Blank:")
             st.dataframe(df_blank_processed)
