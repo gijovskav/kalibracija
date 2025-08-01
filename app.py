@@ -630,10 +630,12 @@ if method_internal_curve and result_df is not None and std_concentrations:
 #krajna tabela
 # --- Безбедно земање имиња од стандард ---
 if method_one_point and not (method_internal_curve or method_external_curve):
-    std_names = df_std['Name'].unique() if 'df_std' in locals() and isinstance(df_std, pd.DataFrame) else []
+    std_names = df_std['Name'].dropna().astype(str).str.strip().str.lower().unique() \
+        if 'df_std' in locals() and isinstance(df_std, pd.DataFrame) else []
 else:
     combined_std_df = pd.concat(std_dataframes, ignore_index=True) if std_dataframes else pd.DataFrame()
-    std_names = combined_std_df['Name'].unique() if not combined_std_df.empty else []
+    std_names = combined_std_df['Name'].dropna().astype(str).str.strip().str.lower().unique() \
+        if not combined_std_df.empty else []
 
 # --- Почетна табела само со имињата од стандардот ---
 df_combined = pd.DataFrame({'Name': sorted(std_names)})
@@ -641,24 +643,30 @@ df_combined = pd.DataFrame({'Name': sorted(std_names)})
 # --- Проверка и подготовка на табелите од методите ---
 dfs_to_merge = []
 
+def normalize_name_column(df):
+    df = df.copy()
+    if 'Name' in df.columns:
+        df['Name'] = df['Name'].astype(str).str.strip().str.lower()
+    return df
+
 # One Point Method
 summary = locals().get('summary')
 if isinstance(summary, pd.DataFrame) and not summary.empty:
-    df_1p = summary.copy()
+    df_1p = normalize_name_column(summary)
     df_1p = df_1p.rename(columns=lambda c: f"{c} (One Point)" if c != 'Name' else c)
     dfs_to_merge.append(df_1p)
 
 # Internal Curve
 df_summary = locals().get('df_summary')
 if isinstance(df_summary, pd.DataFrame) and not df_summary.empty:
-    df_internal = df_summary.copy()
+    df_internal = normalize_name_column(df_summary)
     df_internal = df_internal.rename(columns=lambda c: f"{c} (Internal Curve)" if c != 'Name' else c)
     dfs_to_merge.append(df_internal)
 
 # External Curve
 df_summary_external = locals().get('df_summary_external')
 if isinstance(df_summary_external, pd.DataFrame) and not df_summary_external.empty:
-    df_external = df_summary_external.copy()
+    df_external = normalize_name_column(df_summary_external)
     df_external = df_external.rename(columns=lambda c: f"{c} (External Curve)" if c != 'Name' else c)
     dfs_to_merge.append(df_external)
 
