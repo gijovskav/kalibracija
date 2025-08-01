@@ -430,73 +430,66 @@ if method_external_curve and 'result_df' in locals() and result_df is not None a
 
 
 
-#INTERNA
-# Осигурај се дека result_df и std_concentrations се дефинирани
-if 'result_df' not in locals():
-    result_df = None
-if 'std_concentrations' not in locals():
-    std_concentrations = []
+# Внатрешна калибрација со крива - извршување само ако има потребни податоци
+if method_internal_curve and result_df is not None and not result_df.empty and std_concentrations and std_dataframes:
 
-# Внатрешна калибрација со крива - извршување само ако се вклучи оваа опција
-if method_internal_curve and result_df is not None and std_concentrations:
-
-    # 1. Пресметај C(X)/C(IS) регресија базирана на H(X)/H(IS)
     std_conc_norm = np.array(std_concentrations) / std_concentrations[0]
     std_conc_norm = std_conc_norm.reshape(-1, 1)
 
-    # Подготви ratio_df = H(X)/H(IS) за секој стандард
-    ratio_df = result_df[["Name"]].copy()
-    sample_conc = row["Concentration"]  # замени ако имаш друго име за концентрацијата
-df_std_match = next(
-    (df_std for df_std in std_dataframes if sample_conc in df_std["Concentration"].values),
-    None
-)
-is_row = df_std_match[df_std_match[name_col] == is_name] if df_std_match is not None else pd.DataFrame()
+    regression_results = []
 
-if not is_row.empty:
-    is_height = is_row[height_col_base].values[0]
+    for idx, row in result_df.iterrows():
+        is_name = row["Name"]
+        sample_conc = row.get("Concentration", None)
 
-    if pd.notna(is_height) and is_height != 0:
-        height_cols = [col for col in result_df.columns if col.startswith("Height_")]
-        for col in height_cols:
-            ratio_df[f"Ratio_{col.split('_')[-1]}"] = result_df[col] / is_height
-    else:
-        st.warning(f"⚠️ Висината за IS ({is_name}) не е валидна: {is_height}")
-        ratio_df = None
-else:
-    st.warning(f"⚠️ IS '{is_name}' не е пронајден во стандардот со иста концентрација.")
-    ratio_df = None
+        if sample_conc is None:
+            continue
 
-    # Ако успешно се пресметани односите, продолжи со регресија
-    if ratio_df is not None:
-        regression_results = []
+        # најди стандард со иста концентрација
+        df_std_match = next(
+            (df_std for df_std in std_dataframes if sample_conc in df_std["Concentration"].values),
+            None
+        )
 
-        for idx, row in ratio_df.iterrows():
-            name = row["Name"]
-            ratios = [row.get(f"Ratio_{i+1}", np.nan) for i in range(len(std_concentrations))]
+        if df_std_match is not None:
+            is_row = df_std_match[df_std_match[name_col] == is_name]
+        else:
+            is_row = pd.DataFrame()
 
-            if pd.isna(ratios).any():
-                continue
+        if not is_row.empty:
+            is_height = is_row[height_col_base].values[0]
 
-            y_vals = np.array(ratios).reshape(-1, 1)
-            model = LinearRegression()
-            model.fit(std_conc_norm, y_vals)
+            if pd.notna(is_height) and is_height != 0:
+                height_cols = [col for col in result_df.columns if col.startswith("Height_")]
+                ratios = [row[col] / is_height if pd.notna(row[col]) else np.nan for col in height_cols]
 
-            slope = float(model.coef_)
-            intercept = float(model.intercept_)
-            correl = float(np.corrcoef(std_conc_norm.flatten(), y_vals.flatten())[0, 1])
+                if not any(pd.isna(ratios)):
+                    y_vals = np.array(ratios).reshape(-1, 1)
+                    model = LinearRegression()
+                    model.fit(std_conc_norm, y_vals)
 
-            regression_results.append({
-                "Name": name,
-                "H(X)/H(IS)": "; ".join([f"{r:.3f}" for r in ratios]),
-                "c(X)/c(IS)": f"{slope:.6f}",
-                "Intercept": f"{intercept:.6f}",
-                "Correlation": f"{correl:.4f}"
-            })
+                    slope = float(model.coef_)
+                    intercept = float(model.intercept_)
+                    correl = float(np.corrcoef(std_conc_norm.flatten(), y_vals.flatten())[0, 1])
 
+                    regression_results.append({
+                        "Name": is_name,
+                        "H(X)/H(IS)": "; ".join([f"{r:.3f}" for r in ratios]),
+                        "c(X)/c(IS)": f"{slope:.6f}",
+                        "Intercept": f"{intercept:.6f}",
+                        "Correlation": f"{correl:.4f}"
+                    })
+            else:
+                st.warning(f"⚠️ Висината за IS ({is_name}) не е валидна: {is_height}")
+        else:
+            st.warning(f"⚠️ IS '{is_name}' не е пронајден во стандардот со иста концентрација.")
+
+    # Прикажи резултати ако ги има
+    if regression_results:
         df_c_over_cis = pd.DataFrame(regression_results)
         st.markdown("### Внатрешна калибрациона права")
         st.dataframe(df_c_over_cis)
+
 
         # 2. Примени ги регресиите на бланкови и семплови
         all_samples = []
