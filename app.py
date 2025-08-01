@@ -744,58 +744,7 @@ for method, samples_cols in method_samples.items():
             new_col_name = f"{sample} ({method})"
             df_final[new_col_name] = df_combined[col]
 
-# 3. Сега да го преуредиме df_final по sample - односно сите методи за sample1, па sample2 итн.
 
-# Прво извлечи уникатни samples, без blank
-all_samples = set()
-for col in df_final.columns:
-    if col == 'Name':
-        continue
-    sample = col.split('(')[0].strip()
-    if sample.lower() != 'blank':
-        all_samples.add(sample)
-
-all_samples = sorted(all_samples)
-
-# Состави нов редослед на колони: Name, па сите sample со сите методи за секој sample
-new_cols = ['Name']
-for sample in all_samples:
-    sample_cols = [col for col in df_final.columns if col.startswith(sample)]
-    new_cols.extend(sample_cols)
-
-df_final = df_final[new_cols]
-
-# Прикажи ја финалната табела
-st.markdown("### Финална табела (одземен blank за секој sample по метод):")
-st.dataframe(df_final)
-
-# --- Копче за симнување ---
-
-import io
-
-def to_excel_bytes(dfs: dict):
-    output = io.BytesIO()
-    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-        for sheet_name, df in dfs.items():
-            df.to_excel(writer, sheet_name=sheet_name, index=False)
-        writer.save()
-    processed_data = output.getvalue()
-    return processed_data
-
-# Подготви ги табелите за симнување
-dfs_for_download = {
-    "Combined_All_Methods": df_combined,
-    "Final_Subtracted_Blank": df_final
-}
-
-excel_data = to_excel_bytes(dfs_for_download)
-
-st.download_button(
-    label="Симни ги табелите во Excel",
-    data=excel_data,
-    file_name='finalna_kalibracija.xlsx',
-    mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-)
 
 
 
