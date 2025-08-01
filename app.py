@@ -691,51 +691,37 @@ st.dataframe(df_combined)
 
 
 #odzemanja
-# 1. Нормализирање на 'Name'
-df_combined['Name'] = df_combined['Name'].astype(str).str.strip().str.lower()
+# --- Креирање на финална табела со одземени слепи проби ---
 
-# 2. Подготовка за групирање по метод и sample
-cols = df_combined.columns.tolist()
-cols.remove('Name')
+# Копија од комбинираната табела
+df_corrected = df_combined.copy()
 
-def parse_col(col_name):
-    if '(' in col_name and ')' in col_name:
-        sample = col_name.split('(')[0].strip()
-        method = col_name.split('(')[1].strip(')')
-        return sample, method
-    else:
-        return col_name, ''
+# Извлекување на имињата на сите колони по метод (освен 'Name')
+method_columns = [col for col in df_corrected.columns if col != 'Name']
 
-method_samples = {}
-for col in cols:
-    sample, method = parse_col(col)
-    if method not in method_samples:
-        method_samples[method] = []
-    method_samples[method].append((sample, col))
+# Правиме речник за чување на слепи вредности по метод
+blank_values = {}
 
-# 3. Финална табела каде ќе ги ставиме податоците со одземен blank
+# Детекција на слепа проба: претпоставуваме дека има ред со име што содржи "blank" или "слепа"
+blank_row = df_corrected[df_corrected['Name'].str.contains("blank|слепа", case=False, na=False)]
+
+# Ако има таков ред, ги земаме вредностите по метод
+if not blank_row.empty:
+    for col in method_columns:
+        blank_values[col] = blank_row.iloc[0][col]
+else:
+    # Ако нема слепа проба, ги оставаме сите на 0
+    for col in method_columns:
+        blank_values[col] = 0
+
+# Нова табела со коригирани вредности (одземено blank)
 df_final = pd.DataFrame()
-df_final['Name'] = df_combined['Name']
+df_final['Name'] = df_corrected['Name']
 
-for method, samples_cols in method_samples.items():
-    blank_col = None
-    for sample, col in samples_cols:
-        if sample.lower() == 'blank':
-            blank_col = col
-            break
+for col in method_columns:
+    corrected_col = df_corrected[col] - blank_values[col]
+    df_final[col + " - Blank"] = corrected_col
 
-    if blank_col:
-        for sample, col in samples_cols:
-            if sample.lower() != 'blank':
-                new_col_name = f"{sample} ({method})"
-                df_final[new_col_name] = df_combined[col] - df_combined[blank_col]
-    else:
-        for sample, col in samples_cols:
-            new_col_name = f"{sample} ({method})"
-            df_final[new_col_name] = df_combined[col]
-
-
-
-# 5. Прикажување во Streamlit
-st.markdown("### Финална табела за Internal Curve (одземен blank):")
-st.dataframe(df_internal_final)
+# Прикажување на финалната табела
+st.markdown("### Финална компаративна табела со одземени слепи проби:")
+st.dataframe(df_final)
