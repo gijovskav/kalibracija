@@ -56,7 +56,7 @@ if method_internal_curve or method_external_curve or (method_one_point and (meth
 
 
     # Барање број на стандарди само еднаш
-    num_standards = st.number_input("Колку стандарди ќе користите? Ако користите метода на калибрациона права со внатрешен стандард прв ставете го референтниот стандард", min_value=1, max_value=20, value=5, step=1)
+    num_standards = st.number_input("Колку стандарди ќе користите?", min_value=1, max_value=20, value=5, step=1)
 
     uploaded_std_files = []
     std_concentrations = []
@@ -442,29 +442,24 @@ if method_internal_curve and result_df is not None and std_concentrations:
     std_conc_norm = np.array(std_concentrations) / std_concentrations[0]
     std_conc_norm = std_conc_norm.reshape(-1, 1)
 
-   # Подготви ratio_df = H(X)/H(IS) за секој стандард
-height_cols = [col for col in result_df.columns if col.startswith("Height_")]
-
-for i, col in enumerate(height_cols):
-    if i >= len(std_dataframes):
-        st.warning(f"⚠️ Недостига стандард за колоната {col}")
-        ratio_df[f"Ratio_{i+1}"] = np.nan
-        continue
-
-    df_std = std_dataframes[i]
-    is_row = df_std[df_std[name_col] == is_name]
+    # Подготви ratio_df = H(X)/H(IS) за секој стандард
+    ratio_df = result_df[["Name"]].copy()
+    df_std_first = std_dataframes[0]
+    is_row = df_std_first[df_std_first[name_col] == is_name]
 
     if not is_row.empty:
         is_height = is_row[height_col_base].values[0]
 
         if pd.notna(is_height) and is_height != 0:
-            ratio_df[f"Ratio_{i+1}"] = result_df[col] / is_height
+            height_cols = [col for col in result_df.columns if col.startswith("Height_")]
+            for col in height_cols:
+                ratio_df[f"Ratio_{col.split('_')[-1]}"] = result_df[col] / is_height
         else:
-            st.warning(f"⚠️ IS висината за стандард {i+1} не е валидна: {is_height}")
-            ratio_df[f"Ratio_{i+1}"] = np.nan
+            st.warning(f"⚠️ Висината за IS ({is_name}) не е валидна: {is_height}")
+            ratio_df = None
     else:
-        st.warning(f"⚠️ IS '{is_name}' не е пронајден во стандард {i+1}.")
-        ratio_df[f"Ratio_{i+1}"] = np.nan
+        st.warning(f"⚠️ IS '{is_name}' не е пронајден во првиот стандард.")
+        ratio_df = None
 
     # Ако успешно се пресметани односите, продолжи со регресија
     if ratio_df is not None:
