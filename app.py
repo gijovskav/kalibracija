@@ -458,7 +458,10 @@ if method_external_curve and 'result_df' in locals() and result_df is not None a
 
 
 # Внатрешна калибрација со крива - извршување само ако има потребни податоци
-if method_internal_curve and result_df is not None and not result_df.empty and std_concentrations and std_dataframes:
+if method_internal_curve \
+    and result_df is not None and not result_df.empty \
+    and std_concentrations \
+    and 'std_dataframes' in locals() and std_dataframes:
 
     std_conc_norm = np.array(std_concentrations) / std_concentrations[0]
     std_conc_norm = std_conc_norm.reshape(-1, 1)
