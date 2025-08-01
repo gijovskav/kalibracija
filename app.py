@@ -691,35 +691,31 @@ st.dataframe(df_combined)
 
 
 #odzemanja
-# --- Финална компаративна табела со одземени слепи проби ---
+# --- Финална табела со одземени слепи проби ---
 
-# Копија од комбинираната табела
-df_corrected = df_combined.copy()
+# 1. Копија од комбинираната табела
+df_final_corrected = df_combined.copy()
 
-# Сите методски колони (освен 'Name')
-method_columns = [col for col in df_corrected.columns if col != 'Name']
+# 2. Детектирање редови што се слепи проби (blank/слепа)
+blank_mask = df_final_corrected['Name'].str.contains(r'\b(blank|слепа)\b', case=False, na=False)
 
-# Детектирај кои редови се blanks (по име)
-blank_mask = df_corrected['Name'].str.contains("blank|слепа", case=False, na=False)
+# 3. Издвојување на blank редовите
+df_blanks = df_final_corrected[blank_mask]
 
-# Издвој ги blank редовите
-df_blanks = df_corrected[blank_mask]
+# 4. Издвојување на реалните sample-редови
+df_samples = df_final_corrected[~blank_mask].copy()
 
-# Издвој ги редовите што НЕ се blanks
-df_samples = df_corrected[~blank_mask].copy()
+# 5. Одземање по метод (колона)
+for col in df_samples.columns:
+    if col == 'Name':
+        continue
+    if col in df_blanks.columns:
+        blank_value = df_blanks[col].mean() if not df_blanks.empty else 0
+        df_samples[col] = df_samples[col] - blank_value
 
-# Одземи за секој метод вредноста од blank
-for col in method_columns:
-    if not df_blanks.empty:
-        blank_value = df_blanks[col].mean()  # ако има повеќе blank редови, земи просек
-    else:
-        blank_value = 0  # ако нема blank, нема што да се одземе
+# 6. Финална табела со коригирани вредности
+df_final_corrected = df_samples.reset_index(drop=True)
 
-    df_samples[col] = df_samples[col] - blank_value
-
-# Финалната табела со коригирани вредности и без слепи проби
-df_final = df_samples.reset_index(drop=True)
-
-# --- Прикажи ја табелата ---
+# 7. Прикажи табела
 st.markdown("### Финална компаративна табела со одземени слепи проби:")
-st.dataframe(df_final)
+st.dataframe(df_final_corrected)
