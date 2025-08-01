@@ -182,6 +182,9 @@ else:
         (row['Height (Hz)'] / height_is_sample) * (c_is_start / row['RRF']) 
         if row['RRF'] else None, axis=1)
 
+
+       
+       
     # Пресметка на маса во ng
     df_sample['Маса (ng)'] = df_sample['c(X) / µg L-1'] * v_extract
 
