@@ -428,7 +428,7 @@ if method_external_curve and 'result_df' in locals() and result_df is not None a
 
 
 
-#INTERNA
+# INTERNA
 # Осигурај се дека result_df и std_concentrations се дефинирани
 if 'result_df' not in locals():
     result_df = None
@@ -442,24 +442,24 @@ if method_internal_curve and result_df is not None and std_concentrations:
     std_conc_norm = np.array(std_concentrations) / std_concentrations[0]
     std_conc_norm = std_conc_norm.reshape(-1, 1)
 
-# Подготви ratio_df = H(X)/H(IS) за секој стандард
-ratio_df = result_df[["Name"]].copy()
-height_cols = [col for col in result_df.columns if col.startswith("Height_")]
+    # Подготви ratio_df = H(X)/H(IS) за секој стандард
+    ratio_df = result_df[["Name"]].copy()
+    height_cols = [col for col in result_df.columns if col.startswith("Height_")]
 
-for idx, col in enumerate(height_cols):
-    df_std = std_dataframes[idx]  # земи го соодветниот стандард
-    is_row = df_std[df_std[name_col] == is_name]
+    for idx, col in enumerate(height_cols):
+        df_std = std_dataframes[idx]  # земи го соодветниот стандард
+        is_row = df_std[df_std[name_col] == is_name]
 
-    if not is_row.empty:
-        is_height = is_row[height_col_base].values[0]
-        if pd.notna(is_height) and is_height != 0:
-            ratio_df[f"Ratio_{col.split('_')[-1]}"] = result_df[col] / is_height
+        if not is_row.empty:
+            is_height = is_row[height_col_base].values[0]
+            if pd.notna(is_height) and is_height != 0:
+                ratio_df[f"Ratio_{col.split('_')[-1]}"] = result_df[col] / is_height
+            else:
+                st.warning(f"⚠️ Висината за IS ({is_name}) во стандард {idx+1} не е валидна: {is_height}")
+                ratio_df[f"Ratio_{col.split('_')[-1]}"] = np.nan
         else:
-            st.warning(f"⚠️ Висината за IS ({is_name}) во стандард {idx+1} не е валидна: {is_height}")
+            st.warning(f"⚠️ IS '{is_name}' не е пронајден во стандард {idx+1}.")
             ratio_df[f"Ratio_{col.split('_')[-1]}"] = np.nan
-    else:
-        st.warning(f"⚠️ IS '{is_name}' не е пронајден во стандард {idx+1}.")
-        ratio_df[f"Ratio_{col.split('_')[-1]}"] = np.nan
 
     # Ако успешно се пресметани односите, продолжи со регресија
     if ratio_df is not None:
@@ -481,20 +481,20 @@ for idx, col in enumerate(height_cols):
             correl = float(np.corrcoef(std_conc_norm.flatten(), y_vals.flatten())[0, 1])
 
             regression_results.append({
-    "Name": name,
-    "H(X)/H(IS)": "; ".join([f"{r:.3f}" for r in ratios]),
-    "c(X)/c(IS)": f"{slope:.6f}",
-    "Intercept": f"{intercept:.6f}",
-    "Correlation": f"{correl:.4f}"
-})
+                "Name": name,
+                "H(X)/H(IS)": "; ".join([f"{r:.3f}" for r in ratios]),
+                "c(X)/c(IS)": f"{slope:.6f}",
+                "Intercept": f"{intercept:.6f}",
+                "Correlation": f"{correl:.4f}"
+            })
 
-df_c_over_cis = pd.DataFrame(regression_results)
-st.write("df_c_over_cis columns:", df_c_over_cis.columns)
-st.write("df_c_over_cis preview:", df_c_over_cis.head())
-st.write("df_c_over_cis shape:", df_c_over_cis.shape)
+        df_c_over_cis = pd.DataFrame(regression_results)
+        st.write("df_c_over_cis columns:", df_c_over_cis.columns)
+        st.write("df_c_over_cis preview:", df_c_over_cis.head())
+        st.write("df_c_over_cis shape:", df_c_over_cis.shape)
 
-st.markdown("### Внатрешна калибрациона права")
-st.dataframe(df_c_over_cis)
+        st.markdown("### Внатрешна калибрациона права")
+        st.dataframe(df_c_over_cis)
 
         # 2. Примени ги регресиите на бланкови и семплови
         all_samples = []
@@ -576,56 +576,55 @@ st.dataframe(df_c_over_cis)
         st.markdown("### Внатрешна калибрациона - Samples")
         st.dataframe(df_samples_results)
 
-        
         # Сумирана табела: секој sample посебна колона
-# Заштита од празни или невалидни DataFrame-и
-if df_blank_results.empty or df_samples_results.empty:
-    st.warning("Blank или Sample резултатите се празни - прикачи фајлови.")
-else:
-    if "Name" in df_blank_results.columns and "Name" in df_samples_results.columns:
-        all_names = set(df_blank_results["Name"].unique()) | set(df_samples_results["Name"].unique())
-        sample_ids = df_samples_results["Sample ID"].unique()
+        # Заштита од празни или невалидни DataFrame-и
+        if df_blank_results.empty or df_samples_results.empty:
+            st.warning("Blank или Sample резултатите се празни - прикачи фајлови.")
+        else:
+            if "Name" in df_blank_results.columns and "Name" in df_samples_results.columns:
+                all_names = set(df_blank_results["Name"].unique()) | set(df_samples_results["Name"].unique())
+                sample_ids = df_samples_results["Sample ID"].unique()
 
-        summary_rows = []
+                summary_rows = []
 
-        for name in sorted(all_names):
-            row = {"Name": name}
+                for name in sorted(all_names):
+                    row = {"Name": name}
 
-            # Blank
-            blank_mass = df_blank_results[df_blank_results["Name"] == name]["Final Amount"].sum()
-            row["Blank"] = blank_mass
+                    # Blank
+                    blank_mass = df_blank_results[df_blank_results["Name"] == name]["Final Amount"].sum()
+                    row["Blank"] = blank_mass
 
-            # Секој sample
-            for sid in sample_ids:
-                val = df_samples_results[
-                    (df_samples_results["Name"] == name) & 
-                    (df_samples_results["Sample ID"] == sid)
-                ]["Final Amount"].sum()
-                row[sid] = val
+                    # Секој sample
+                    for sid in sample_ids:
+                        val = df_samples_results[
+                            (df_samples_results["Name"] == name) & 
+                            (df_samples_results["Sample ID"] == sid)
+                        ]["Final Amount"].sum()
+                        row[sid] = val
 
-            summary_rows.append(row)
+                    summary_rows.append(row)
 
-        df_summary = pd.DataFrame(summary_rows)
+                df_summary = pd.DataFrame(summary_rows)
 
-        st.markdown("### Внатрешна калибрациона - сумирано")
-        st.dataframe(df_summary)
+                st.markdown("### Внатрешна калибрациона - сумирано")
+                st.dataframe(df_summary)
 
-        # Генерирај Excel
-        output_excel = io.BytesIO()
-        with pd.ExcelWriter(output_excel, engine="openpyxl") as writer:
-            df_blank_results.to_excel(writer, sheet_name="Blank", index=False)
-            df_samples_results.to_excel(writer, sheet_name="Samples", index=False)
-            df_summary.to_excel(writer, sheet_name="Summary", index=False)
-        output_excel.seek(0)
+                # Генерирај Excel
+                output_excel = io.BytesIO()
+                with pd.ExcelWriter(output_excel, engine="openpyxl") as writer:
+                    df_blank_results.to_excel(writer, sheet_name="Blank", index=False)
+                    df_samples_results.to_excel(writer, sheet_name="Samples", index=False)
+                    df_summary.to_excel(writer, sheet_name="Summary", index=False)
+                output_excel.seek(0)
 
-        st.download_button(
-            label="💾 Симни резултати - внатрешна калибрациона",
-            data=output_excel.getvalue(),
-            file_name="vnatresna_kalibraciona.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
-    else:
-        st.error("❌ Недостасува колоната 'Name' во некој од резултатите.")
+                st.download_button(
+                    label="💾 Симни резултати - внатрешна калибрациона",
+                    data=output_excel.getvalue(),
+                    file_name="vnatresna_kalibraciona.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                )
+            else:
+                st.error("❌ Недостасува колоната 'Name' во некој од резултатите.")
 
 
 
