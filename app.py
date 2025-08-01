@@ -447,19 +447,19 @@ if method_internal_curve and result_df is not None and std_concentrations:
     std_conc_norm = np.array(std_concentrations) / std_concentrations[0]
     std_conc_norm = std_conc_norm.reshape(-1, 1)
 
-    # Подготви ratio_df = H(X)/H(IS) за секој стандард
-    ratio_df = result_df[["Name"]].copy()
-    df_std_first = std_dataframes[0]
-    height_cols = [col for col in result_df.columns if col.startswith("Height_")]
-    for idx, col in enumerate(height_cols):
-        df_std = std_dataframes[idx]  # земи го соодветниот стандард
-        is_row = df_std[df_std[name_col] == is_name]
+# Подготви ratio_df = H(X)/H(IS) за секој стандард
+ratio_df = result_df[["Name"]].copy()
+height_cols = [col for col in result_df.columns if col.startswith("Height_")]
 
-        if not is_row.empty:
-            is_height = is_row[height_col_base].values[0]
-            if pd.notna(is_height) and is_height != 0:
+for idx, col in enumerate(height_cols):
+    df_std = std_dataframes[idx]  # земи го соодветниот стандард
+    is_row = df_std[df_std[name_col] == is_name]
+
+    if not is_row.empty:
+        is_height = is_row[height_col_base].values[0]
+        if pd.notna(is_height) and is_height != 0:
             ratio_df[f"Ratio_{col.split('_')[-1]}"] = result_df[col] / is_height
-         else:
+        else:
             st.warning(f"⚠️ Висината за IS ({is_name}) во стандард {idx+1} не е валидна: {is_height}")
             ratio_df[f"Ratio_{col.split('_')[-1]}"] = np.nan
     else:
