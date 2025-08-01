@@ -198,9 +198,9 @@ if blank_file is not None and std_dataframes and is_name:
 else:
     st.info("📥 За да се пресмета blank, прикачи ги и стандардниот фајл и IS.")
 
-        if df_blank_processed is not None:
-            st.markdown("### Калибрација со една точка - Blank:")
-            st.dataframe(df_blank_processed)
+if df_blank_processed is not None:
+    st.markdown("### Калибрација со една точка - Blank:")
+    st.dataframe(df_blank_processed)
 
     # --- Пример за samples обработка ---
     sample_tables = []
