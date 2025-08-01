@@ -456,7 +456,8 @@ if method_external_curve and 'result_df' in locals() and result_df is not None a
 
 
 
-
+if 'result_df' not in locals():
+    result_df = pd.DataFrame()
 # Внатрешна калибрација со крива - извршување само ако има потребни податоци
 if method_internal_curve \
     and result_df is not None and not result_df.empty \
