@@ -691,37 +691,36 @@ st.dataframe(df_combined)
 
 
 #odzemanja
-# --- Креирање на финална табела со одземени слепи проби ---
+# --- Финална компаративна табела со одземени слепи проби ---
 
 # Копија од комбинираната табела
 df_corrected = df_combined.copy()
 
-# Извлекување на имињата на сите колони по метод (освен 'Name')
+# Имиња на колоните од методите (сите освен 'Name')
 method_columns = [col for col in df_corrected.columns if col != 'Name']
 
-# Правиме речник за чување на слепи вредности по метод
+# Детекција на blank редови (по име)
+is_blank_row = df_corrected['Name'].str.contains("blank|слепа", case=False, na=False)
+blank_rows = df_corrected[is_blank_row]
+
+# --- Собирање на blank вредности по метод ---
 blank_values = {}
+for col in method_columns:
+    if not blank_rows.empty:
+        # Земаме просек ако има повеќе blank реда
+        blank_values[col] = blank_rows[col].mean()
+    else:
+        blank_values[col] = 0  # Ако нема blank, одземај 0 (нема корекција)
 
-# Детекција на слепа проба: претпоставуваме дека има ред со име што содржи "blank" или "слепа"
-blank_row = df_corrected[df_corrected['Name'].str.contains("blank|слепа", case=False, na=False)]
-
-# Ако има таков ред, ги земаме вредностите по метод
-if not blank_row.empty:
-    for col in method_columns:
-        blank_values[col] = blank_row.iloc[0][col]
-else:
-    # Ако нема слепа проба, ги оставаме сите на 0
-    for col in method_columns:
-        blank_values[col] = 0
-
-# Нова табела со коригирани вредности (одземено blank)
-df_final = pd.DataFrame()
-df_final['Name'] = df_corrected['Name']
+# --- Примена на корекцијата на секој sample ред (освен blank редови) ---
+non_blank_df = df_corrected[~is_blank_row].copy()
 
 for col in method_columns:
-    corrected_col = df_corrected[col] - blank_values[col]
-    df_final[col + " - Blank"] = corrected_col
+    non_blank_df[col] = non_blank_df[col] - blank_values[col]
 
-# Прикажување на финалната табела
+# --- Финалната табела ---
+df_final = non_blank_df.reset_index(drop=True)
+
+# --- Прикажување ---
 st.markdown("### Финална компаративна табела со одземени слепи проби:")
 st.dataframe(df_final)
