@@ -177,7 +177,7 @@ else:
 
 
 def process_sample(df_sample, df_std, c_is_start, v_extract, is_name):
-# Пресметка на c(X)
+    # Пресметка на c(X)
     df_sample['c(X) / µg L-1'] = df_sample.apply(lambda row: 
         (row['Height (Hz)'] / height_is_sample) * (c_is_start / row['RRF']) 
         if row['RRF'] else None, axis=1)  
@@ -185,7 +185,9 @@ def process_sample(df_sample, df_std, c_is_start, v_extract, is_name):
     # Пресметка на маса во ng
     df_sample['Маса (ng)'] = df_sample['c(X) / µg L-1'] * v_extract
 
-return df_sample[['Ред. бр.', 'Name', 'RT (min)', 'Height (Hz)', 'RRF', 'c(X) / µg L-1', 'Маса (ng)']]
+    return df_sample[['Ред. бр.', 'Name', 'RT (min)', 'Height (Hz)', 'RRF', 'c(X) / µg L-1', 'Маса (ng)']]
+
+
 
 
     # --- Пример за blank обработка ---
