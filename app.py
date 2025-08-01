@@ -182,7 +182,7 @@ else:
         # Пресметка на маса во ng
     df_sample['Маса (ng)'] = df_sample['c(X) / µg L-1'] * v_extract
 
-        return df_sample[['Ред. бр.', 'Name', 'RT (min)', 'Height (Hz)', 'RRF', 'c(X) / µg L-1', 'Маса (ng)']]
+    return df_sample[['Ред. бр.', 'Name', 'RT (min)', 'Height (Hz)', 'RRF', 'c(X) / µg L-1', 'Маса (ng)']]
 
     # --- Пример за blank обработка ---
    if blank_file is not None and std_dataframes and is_name:
