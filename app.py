@@ -159,7 +159,13 @@ if method_one_point:
         # Генерира реден број
         df_sample.insert(0, "Ред. бр.", range(1, len(df_sample) + 1))
 
-      # Безбедно наоѓање RRF од стандарди според Name
+if 'df_sample' not in locals():
+    df_sample = pd.DataFrame()
+
+if 'df_std' not in locals():
+    df_std = pd.DataFrame()
+
+# Безбедно наоѓање RRF од стандарди според Name
 if df_std is not None and not df_std.empty and 'Name' in df_std.columns and 'RRF' in df_std.columns:
     def get_rrf(name):
         match = df_std[df_std['Name'] == name]
