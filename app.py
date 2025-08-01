@@ -691,31 +691,70 @@ st.dataframe(df_combined)
 
 
 #odzemanja
-# --- Финална табела со одземени слепи проби ---
+import re
 
-# 1. Копија од комбинираната табела
-df_final_corrected = df_combined.copy()
+# --- Помошна функција: нормализирање ---
+def normalize(df, method_label):
+    df = df.copy()
+    df['Name'] = df['Name'].astype(str).str.strip().str.lower()
+    df = df.rename(columns={col: f"{col} ({method_label})" for col in df.columns if col != 'Name'})
+    return df
 
-# 2. Детектирање редови што се слепи проби (blank/слепа)
-blank_mask = df_final_corrected['Name'].str.contains(r'\b(blank|слепа)\b', case=False, na=False)
+# --- Главна функција: корекција по метод со сопствен blank ---
+def correct_by_individual_blank(df_method, method_label):
+    df_method = normalize(df_method, method_label)
+    val_col = [col for col in df_method.columns if col != 'Name'][0]
 
-# 3. Издвојување на blank редовите
-df_blanks = df_final_corrected[blank_mask]
+    corrected_rows = []
 
-# 4. Издвојување на реалните sample-редови
-df_samples = df_final_corrected[~blank_mask].copy()
+    for idx, row in df_method.iterrows():
+        name = row['Name']
+        
+        # Skip blank rows
+        if re.search(r'\b(blank|слепа)\b', name, flags=re.IGNORECASE):
+            continue
 
-# 5. Одземање по метод (колона)
-for col in df_samples.columns:
-    if col == 'Name':
-        continue
-    if col in df_blanks.columns:
-        blank_value = df_blanks[col].mean() if not df_blanks.empty else 0
-        df_samples[col] = df_samples[col] - blank_value
+        # Tentaive blank name (tries to match with corresponding blank)
+        possible_blank_names = [
+            f"blank {name}", f"слепа {name}", f"{name} blank", f"{name} слепа"
+        ]
 
-# 6. Финална табела со коригирани вредности
-df_final_corrected = df_samples.reset_index(drop=True)
+        blank_row = df_method[df_method['Name'].isin(possible_blank_names)]
 
-# 7. Прикажи табела
-st.markdown("### Финална компаративна табела со одземени слепи проби:")
-st.dataframe(df_final_corrected)
+        if not blank_row.empty:
+            blank_val = blank_row.iloc[0][val_col]
+        else:
+            blank_val = 0  # ако нема blank за овој sample
+
+        corrected_val = row[val_col] - blank_val
+
+        corrected_rows.append({'Name': name, f"{val_col} (corrected)": corrected_val})
+
+    return pd.DataFrame(corrected_rows)
+
+# --- Собери ги сите методи и обработи ги одделно ---
+final_tables = []
+
+if isinstance(summary, pd.DataFrame) and not summary.empty:
+    corrected_1p = correct_by_individual_blank(summary, "One Point")
+    final_tables.append(corrected_1p)
+
+if isinstance(df_summary, pd.DataFrame) and not df_summary.empty:
+    corrected_internal = correct_by_individual_blank(df_summary, "Internal Curve")
+    final_tables.append(corrected_internal)
+
+if isinstance(df_summary_external, pd.DataFrame) and not df_summary_external.empty:
+    corrected_external = correct_by_individual_blank(df_summary_external, "External Curve")
+    final_tables.append(corrected_external)
+
+# --- Спојување на сите во една табела по Name ---
+from functools import reduce
+df_final = reduce(lambda left, right: pd.merge(left, right, on='Name', how='outer'), final_tables)
+
+# --- Сортирање и пополнување празни вредности ---
+df_final = df_final.fillna(0)
+df_final = df_final.sort_values('Name').reset_index(drop=True)
+
+# --- Приказ ---
+st.markdown("### Финална компаративна табела со одземени индивидуални слепи проби:")
+st.dataframe(df_final)
