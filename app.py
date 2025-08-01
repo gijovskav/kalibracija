@@ -626,6 +626,12 @@ if method_internal_curve and result_df is not None and std_concentrations:
 
 
 
+if df_blank_processed is not None:
+    st.write("Колони во df_blank_processed:", df_blank_processed.columns.tolist())
+    if "Маса (ng)" in df_blank_processed.columns:
+        blank_mass = df_blank_processed.groupby("Name")["Маса (ng)"].sum().reset_index()
+    else:
+        st.error("Колоната 'Маса (ng)' ја нема во df_blank_processed!")
 
 
 import pandas as pd
