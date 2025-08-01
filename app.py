@@ -626,68 +626,37 @@ if method_internal_curve and result_df is not None and std_concentrations:
 
 
 
-if df_blank_processed is not None:
-    st.write("Колони во df_blank_processed:", df_blank_processed.columns.tolist())
-    if "Маса (ng)" in df_blank_processed.columns:
-        blank_mass = df_blank_processed.groupby("Name")["Маса (ng)"].sum().reset_index()
-    else:
-        st.error("Колоната 'Маса (ng)' ја нема во df_blank_processed!")
 
+#sumarna tabela
+all_samples = []
 
-import pandas as pd
-from io import BytesIO
+# Бланк
+if blank_file is not None:
+    blank_df = pd.read_excel(blank_file)
+    df_blank_processed = process_sample(blank_df, df_std, c_is_start, v_extract, is_name)
+    if df_blank_processed is not None:
+        df_blank_processed["Sample ID"] = "Blank"
+        all_samples.append(df_blank_processed)
 
-# --- КОМПАРАТИВНА СУМАРНА ТАБЕЛА ЗА СИТЕ МЕТОДИ ---
-# Функција за извлекување на уникатни имиња од стандарден документ
-def extract_names_from_std(df_std, col_name="Name"):
-    if col_name in df_std.columns:
-        return df_std[col_name].dropna().unique().tolist()
-    else:
-        return []
+# Сите семпли
+for idx, sample_file in enumerate(sample_files):
+    sample_df = pd.read_excel(sample_file)
+    df_sample_processed = process_sample(sample_df, df_std, c_is_start, v_extract, is_name)
+    if df_sample_processed is not None:
+        df_sample_processed["Sample ID"] = f"Sample {idx + 1}"
+        all_samples.append(df_sample_processed)
 
-# --- Во твојот код, после вчитување на стандарден документ ---
+# Спој ги сите
+if all_samples:
+    df_all = pd.concat(all_samples, ignore_index=True)
 
-if method_one_point:
-    if std_file_one_point is not None:
-        df_std = pd.read_excel(std_file_one_point)
-        names_list = extract_names_from_std(df_std, col_name="Name")
-else:
-    # Кога е друг метод
-    if uploaded_std_files:
-        df_std_first = pd.read_excel(uploaded_std_files[0])
-        names_list = extract_names_from_std(df_std_first, col_name="Name")
-    else:
-        names_list = []
+    # Групирај и сумирај маси
+    summary = (
+        df_all.groupby(["Name", "Sample ID"])["Маса (ng)"]
+        .sum()
+        .unstack(fill_value=0)
+        .reset_index()
+    )
 
-# Сега да ги споиме податоците од blank и sample табелите (кои претходно ги обработи)
-
-# df_blank_processed и sample_tables се dataframe-ови кои ги добиваш од process_sample
-
-if df_blank_processed is not None and sample_tables and names_list:
-    # Правиме празен summary dataframe со уникатни имиња од стандарден документ
-    summary = pd.DataFrame({"Name": names_list})
-
-    # Придружуваме blank маси
-    blank_mass = df_blank_processed.groupby("Name")["Маса (ng)"].sum().reset_index()
-    blank_mass.rename(columns={"Маса (ng)": "Маса (ng) Blank"}, inplace=True)
-    summary = summary.merge(blank_mass, on="Name", how="left")
-
-    # Придружуваме sample маси
-    for i, df_sample_proc in enumerate(sample_tables):
-        sample_mass = df_sample_proc.groupby("Name")["Маса (ng)"].sum().reset_index()
-        sample_mass.rename(columns={"Маса (ng)": f"Маса (ng) Sample {i + 1}"}, inplace=True)
-        summary = summary.merge(sample_mass, on="Name", how="left")
-
-    summary.fillna(0, inplace=True)
-
-    st.markdown("### Сумарна табела со сите маси:")
+    st.markdown("### Калибрација - сумарна табела (Blank + Samples):")
     st.dataframe(summary)
-
-    # Табела со одземена blank маса (sample - blank)
-    corrected = summary.copy()
-    for col in summary.columns:
-        if col.startswith("Маса (ng) Sample"):
-            corrected[col] = corrected[col] - corrected["Маса (ng) Blank"]
-
-    st.markdown("### Сумарна табела со одземена Blank маса:")
-    st.dataframe(corrected)
