@@ -495,12 +495,36 @@ if method_internal_curve and result_df is not None and std_concentrations:
         else:
             st.warning(f"⚠️ IS '{is_name}' не е пронајден во стандардот со иста концентрација.")
 
-    # Прикажи резултати ако ги има
-    if regression_results:
+    # Ако успешно се пресметани односите, продолжи со регресија
+    if ratio_df is not None:
+        regression_results = []
+
+        for idx, row in ratio_df.iterrows():
+            name = row["Name"]
+            ratios = [row.get(f"Ratio_{i+1}", np.nan) for i in range(len(std_concentrations))]
+
+            if pd.isna(ratios).any():
+                continue
+
+            y_vals = np.array(ratios).reshape(-1, 1)
+            model = LinearRegression()
+            model.fit(std_conc_norm, y_vals)
+
+            slope = float(model.coef_)
+            intercept = float(model.intercept_)
+            correl = float(np.corrcoef(std_conc_norm.flatten(), y_vals.flatten())[0, 1])
+
+            regression_results.append({
+                "Name": name,
+                "H(X)/H(IS)": "; ".join([f"{r:.3f}" for r in ratios]),
+                "c(X)/c(IS)": f"{slope:.6f}",
+                "Intercept": f"{intercept:.6f}",
+                "Correlation": f"{correl:.4f}"
+            })
+
         df_c_over_cis = pd.DataFrame(regression_results)
         st.markdown("### Внатрешна калибрациона права")
         st.dataframe(df_c_over_cis)
-
 
         # 2. Примени ги регресиите на бланкови и семплови
         all_samples = []
@@ -582,6 +606,57 @@ if method_internal_curve and result_df is not None and std_concentrations:
         st.markdown("### Внатрешна калибрациона - Samples")
         st.dataframe(df_samples_results)
 
+        
+
+        # Сумирана табела: секој sample посебна колона
+# Заштита од празни или невалидни DataFrame-и
+if df_blank_results.empty or df_samples_results.empty:
+    st.warning("Blank или Sample резултатите се празни - прикачи фајлови.")
+else:
+    if "Name" in df_blank_results.columns and "Name" in df_samples_results.columns:
+        all_names = set(df_blank_results["Name"].unique()) | set(df_samples_results["Name"].unique())
+        sample_ids = df_samples_results["Sample ID"].unique()
+
+        summary_rows = []
+
+        for name in sorted(all_names):
+            row = {"Name": name}
+
+            # Blank
+            blank_mass = df_blank_results[df_blank_results["Name"] == name]["Final Amount"].sum()
+            row["Blank"] = blank_mass
+
+            # Секој sample
+            for sid in sample_ids:
+                val = df_samples_results[
+                    (df_samples_results["Name"] == name) & 
+                    (df_samples_results["Sample ID"] == sid)
+                ]["Final Amount"].sum()
+                row[sid] = val
+
+            summary_rows.append(row)
+
+        df_summary = pd.DataFrame(summary_rows)
+
+        st.markdown("### Внатрешна калибрациона - сумирано")
+        st.dataframe(df_summary)
+
+        # Генерирај Excel
+        output_excel = io.BytesIO()
+        with pd.ExcelWriter(output_excel, engine="openpyxl") as writer:
+            df_blank_results.to_excel(writer, sheet_name="Blank", index=False)
+            df_samples_results.to_excel(writer, sheet_name="Samples", index=False)
+            df_summary.to_excel(writer, sheet_name="Summary", index=False)
+        output_excel.seek(0)
+
+        st.download_button(
+            label="💾 Симни резултати - внатрешна калибрациона",
+            data=output_excel.getvalue(),
+            file_name="vnatresna_kalibraciona.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+    else:
+        st.error("❌ Недостасува колоната 'Name' во некој од резултатите.")
         
 
         # Сумирана табела: секој sample посебна колона
