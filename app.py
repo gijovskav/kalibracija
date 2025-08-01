@@ -489,9 +489,7 @@ if method_internal_curve and result_df is not None and std_concentrations:
             })
 
         df_c_over_cis = pd.DataFrame(regression_results)
-        st.write("df_c_over_cis columns:", df_c_over_cis.columns)
         st.write("df_c_over_cis preview:", df_c_over_cis.head())
-        st.write("df_c_over_cis shape:", df_c_over_cis.shape)
 
         st.markdown("### Внатрешна калибрациона права")
         st.dataframe(df_c_over_cis)
