@@ -632,18 +632,14 @@ if method_internal_curve and result_df is not None and std_concentrations:
 if method_one_point and not (method_internal_curve or method_external_curve):
     std_names = df_std['Name'].unique() if 'df_std' in locals() and isinstance(df_std, pd.DataFrame) else []
 else:
-    # Комбинирај ги сите std dataframe-ови во една табела па извлечи уникатни имиња
     combined_std_df = pd.concat(std_dataframes, ignore_index=True) if std_dataframes else pd.DataFrame()
-    if not combined_std_df.empty and 'Name' in combined_std_df.columns:
-        std_names = combined_std_df['Name'].unique()
-    else:
-        std_names = []
+    std_names = combined_std_df['Name'].unique() if not combined_std_df.empty else []
 
-df_combined = pd.DataFrame({'Name': std_names})
+# --- Почетна табела само со имињата од стандардот ---
+df_combined = pd.DataFrame({'Name': sorted(std_names)})
 
-# --- Проверка кои табели се достапни ---
+# --- Проверка и подготовка на табелите од методите ---
 dfs_to_merge = []
-method_labels = []
 
 # One Point Method
 summary = locals().get('summary')
@@ -651,7 +647,6 @@ if isinstance(summary, pd.DataFrame) and not summary.empty:
     df_1p = summary.copy()
     df_1p = df_1p.rename(columns=lambda c: f"{c} (One Point)" if c != 'Name' else c)
     dfs_to_merge.append(df_1p)
-    method_labels.append('One Point')
 
 # Internal Curve
 df_summary = locals().get('df_summary')
@@ -659,7 +654,6 @@ if isinstance(df_summary, pd.DataFrame) and not df_summary.empty:
     df_internal = df_summary.copy()
     df_internal = df_internal.rename(columns=lambda c: f"{c} (Internal Curve)" if c != 'Name' else c)
     dfs_to_merge.append(df_internal)
-    method_labels.append('Internal Curve')
 
 # External Curve
 df_summary_external = locals().get('df_summary_external')
@@ -667,23 +661,14 @@ if isinstance(df_summary_external, pd.DataFrame) and not df_summary_external.emp
     df_external = df_summary_external.copy()
     df_external = df_external.rename(columns=lambda c: f"{c} (External Curve)" if c != 'Name' else c)
     dfs_to_merge.append(df_external)
-    method_labels.append('External Curve')
 
-# --- Комбинирај ги сите уникатни имиња од табелите ---
-all_names = set(std_names)
-for df in dfs_to_merge:
-    if 'Name' in df.columns:
-        all_names.update(df['Name'].unique())
-
-df_combined = pd.DataFrame({'Name': sorted(all_names)})
-
-# --- Спојување на сите достапни табели по Name ---
+# --- Спојување само според стандардните имиња ---
 for df_method in dfs_to_merge:
     df_combined = df_combined.merge(df_method, on='Name', how='left')
 
-# --- Пополнување на празни со 0 ---
+# --- Пополнување празни вредности со 0 ---
 df_combined = df_combined.fillna(0)
 
-# --- Прикажување ---
+# --- Прикажи резултат ---
 st.markdown("### Комбинирана сумирана табела за сите методи и samples:")
 st.dataframe(df_combined)
