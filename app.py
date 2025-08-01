@@ -689,106 +689,114 @@ st.dataframe(df_combined)
 
 
 
-#odzemame blenkovi
-# Копија за работа
-df_final = df_combined.copy()
 
-# Функција што ќе најде blank колони и ќе одзема од sample колони по метод
-def subtract_blank(df, method_label):
-    # Примери за blank колона: 'Blank (One Point)', 'Blank (Internal Curve)', 'Blank (External Curve)'
+#odzemanja
+# Прво, нормализирај го 'Name' (стандарден) ако треба, и филтрирај празни
+df_combined['Name'] = df_combined['Name'].astype(str).str.strip().str.lower()
+
+# Пример за колони:
+# Name, sample1 (One Point), blank (One Point), sample2 (One Point), ..., sample1 (Internal Curve), blank (Internal Curve), ...
+
+# 1. Ќе го извадам името на методите и sample-ите од колоните
+cols = df_combined.columns.tolist()
+cols.remove('Name')
+
+# Функција да се извлече sample и метод од име на колона
+def parse_col(col_name):
+    # Пример: "sample1 (One Point)" -> ("sample1", "One Point")
+    if '(' in col_name and ')' in col_name:
+        sample = col_name.split('(')[0].strip()
+        method = col_name.split('(')[1].strip(')')
+        return sample, method
+    else:
+        return col_name, ''
+
+# Групирање по метод
+method_samples = {}
+for col in cols:
+    sample, method = parse_col(col)
+    if method not in method_samples:
+        method_samples[method] = []
+    method_samples[method].append((sample, col))
+
+# 2. За секој метод ќе ги одземеме вредностите од blank sample
+df_final = pd.DataFrame()
+df_final['Name'] = df_combined['Name']
+
+for method, samples_cols in method_samples.items():
+    # Наоѓаме колона со blank sample
     blank_col = None
-    for col in df.columns:
-        if col.lower().startswith('blank') and method_label.lower() in col.lower():
+    for sample, col in samples_cols:
+        if sample.lower() == 'blank':
             blank_col = col
             break
-    if not blank_col:
-        return df  # Ако нема blank, врати како што е
+    
+    # Ако има blank
+    if blank_col:
+        # Одземање на blank од останатите sample (освен blank сама)
+        for sample, col in samples_cols:
+            if sample.lower() != 'blank':
+                new_col_name = f"{sample} ({method})"
+                df_final[new_col_name] = df_combined[col] - df_combined[blank_col]
+    else:
+        # Ако нема blank, само копирај ги колоните
+        for sample, col in samples_cols:
+            new_col_name = f"{sample} ({method})"
+            df_final[new_col_name] = df_combined[col]
 
-    # Одземи blank од сите колони за таа метода освен Name и blank самата
-    for col in df.columns:
-        if col != 'Name' and col != blank_col and col.endswith(f"({method_label})"):
-            df[col] = df[col] - df[blank_col]
+# 3. Сега да го преуредиме df_final по sample - односно сите методи за sample1, па sample2 итн.
 
-    return df
+# Прво извлечи уникатни samples, без blank
+all_samples = set()
+for col in df_final.columns:
+    if col == 'Name':
+        continue
+    sample = col.split('(')[0].strip()
+    if sample.lower() != 'blank':
+        all_samples.add(sample)
 
-# Список на методи според кои имаме колони во df_combined
-methods = ['One Point', 'Internal Curve', 'External Curve']
+all_samples = sorted(all_samples)
 
-# Применуваме одземање на blank по секој метод
-for method in methods:
-    df_final = subtract_blank(df_final, method)
+# Состави нов редослед на колони: Name, па сите sample со сите методи за секој sample
+new_cols = ['Name']
+for sample in all_samples:
+    sample_cols = [col for col in df_final.columns if col.startswith(sample)]
+    new_cols.extend(sample_cols)
 
-# Пополнување евентуални NaN со 0
-df_final = df_final.fillna(0)
+df_final = df_final[new_cols]
 
-# Прикажи финална табела
-st.markdown("### Финална табела со одземен Blank по метод и sample:")
+# Прикажи ја финалната табела
+st.markdown("### Финална табела (одземен blank за секој sample по метод):")
 st.dataframe(df_final)
 
-
-
-
-#redime 
-# Прво ги земаме сите колони освен 'Name'
-cols = [c for c in df_final.columns if c != 'Name']
-
-# Функција што извлекува sample бројка и метод од името на колоната
-import re
-def extract_sample_and_method(col_name):
-    # Пример колона: 'Sample 1 (One Point)'
-    sample_match = re.search(r'sample\s*(\d+)', col_name, re.I)
-    method_match = re.search(r'\(([^)]+)\)', col_name)
-    sample_num = int(sample_match.group(1)) if sample_match else 0
-    method = method_match.group(1) if method_match else ''
-    return (sample_num, method)
-
-# Сортирање по sample број, па по метод
-cols_sorted = sorted(cols, key=extract_sample_and_method)
-
-# Краен редослед на колони: Name + сортирани останати
-final_columns_order = ['Name'] + cols_sorted
-
-# Пренаредување на колоните
-df_final = df_final[final_columns_order]
-
-# Прикажи ја финалната табела со новиот редослед
-st.markdown("### Финална табела со одземен Blank и подредени колони по Sample и метод:")
-st.dataframe(df_final)
-
-
-
+# --- Копче за симнување ---
 
 import io
-import pandas as pd
 
-# Претпоставуваме дека ги имаш овие DataFrame-ови
-# summary, df_summary, df_summary_external, df_final (финална_kалибрација)
-
-# Функција за генерирање Excel фајл во меморија
-def to_excel_bytes():
+def to_excel_bytes(dfs: dict):
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-        if isinstance(summary, pd.DataFrame):
-            summary.to_excel(writer, sheet_name='One_Point')
-        if isinstance(df_summary, pd.DataFrame):
-            df_summary.to_excel(writer, sheet_name='Internal_Curve')
-        if isinstance(df_summary_external, pd.DataFrame):
-            df_summary_external.to_excel(writer, sheet_name='External_Curve')
-        if isinstance(df_final, pd.DataFrame):
-            df_final.to_excel(writer, sheet_name='finalna_kalibracija')
+        for sheet_name, df in dfs.items():
+            df.to_excel(writer, sheet_name=sheet_name, index=False)
         writer.save()
     processed_data = output.getvalue()
     return processed_data
 
-# Копче за симнување
-excel_data = to_excel_bytes()
+# Подготви ги табелите за симнување
+dfs_for_download = {
+    "Combined_All_Methods": df_combined,
+    "Final_Subtracted_Blank": df_final
+}
+
+excel_data = to_excel_bytes(dfs_for_download)
 
 st.download_button(
-    label="Симни ги сите табели Excel",
+    label="Симни ги табелите во Excel",
     data=excel_data,
-    file_name='kalibracija_final.xlsx',
+    file_name='finalna_kalibracija.xlsx',
     mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 )
+
 
 
 
