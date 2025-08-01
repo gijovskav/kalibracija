@@ -185,7 +185,7 @@ else:
     return df_sample[['Ред. бр.', 'Name', 'RT (min)', 'Height (Hz)', 'RRF', 'c(X) / µg L-1', 'Маса (ng)']]
 
     # --- Пример за blank обработка ---
-   if blank_file is not None and std_dataframes and is_name:
+if blank_file is not None and std_dataframes and is_name:
     blank_df = pd.read_excel(blank_file)
     df_std = std_dataframes[0]  # или најди со иста концентрација ако сакаш
     if not df_std.empty:
