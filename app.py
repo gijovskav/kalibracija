@@ -3,6 +3,8 @@ import pandas as pd
 import numpy as np
 from sklearn.linear_model import LinearRegression
 import io
+from io import BytesIO
+
 
 df_std = None
 df_blank_processed = None
