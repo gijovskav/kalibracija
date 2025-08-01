@@ -627,3 +627,48 @@ if method_internal_curve and result_df is not None and std_concentrations:
 
 
 
+#krajna tabela
+# Проверка кои табели се достапни
+dfs_to_merge = []
+method_labels = []
+
+if 'summary' in locals() and not summary.empty:  # One point method
+    df_1p = summary.copy()
+    df_1p = df_1p.rename(columns=lambda c: f"{c} (One Point)" if c != 'Name' else c)
+    dfs_to_merge.append(df_1p)
+    method_labels.append('One Point')
+
+if 'df_summary' in locals() and not df_summary.empty:
+    # Ова е за Внатрешна калибрациона, па да го препознаеме со label
+    df_internal = df_summary.copy()
+    df_internal = df_internal.rename(columns=lambda c: f"{c} (Internal Curve)" if c != 'Name' else c)
+    dfs_to_merge.append(df_internal)
+    method_labels.append('Internal Curve')
+
+if 'df_summary_external' in locals() and not df_summary_external.empty:
+    # Надворешна калибрациона
+    df_external = df_summary_external.copy()
+    df_external = df_external.rename(columns=lambda c: f"{c} (External Curve)" if c != 'Name' else c)
+    dfs_to_merge.append(df_external)
+    method_labels.append('External Curve')
+
+# Собираме уникатни имња од сите достапни табели
+all_names = set()
+for df in dfs_to_merge:
+    all_names.update(df['Name'].unique())
+
+df_combined = pd.DataFrame({'Name': sorted(all_names)})
+
+# Спојување на сите табели по 'Name'
+for df_method in dfs_to_merge:
+    df_combined = df_combined.merge(df_method, on='Name', how='left')
+
+# Пополнуваме NaN со 0 или со празно (според што ти треба)
+df_combined = df_combined.fillna(0)
+
+# Прикажи ја комбинираната табела
+st.markdown("### Комбинирана сумирана табела за сите методи и samples:")
+st.dataframe(df_combined)
+
+
+
