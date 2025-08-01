@@ -347,7 +347,7 @@ if method_external_curve and 'result_df' in locals() and result_df is not None a
     def calculate_concentration_and_mass(df, df_calib, v_extract):
         df_result = df.copy()
         df_result["c(X) / µg/L"] = None
-        df_result["m(X) / ng"] = None
+        df_result["Маса (ng)"] = None
 
         for idx, row in df_result.iterrows():
             name = row.get("Name")
@@ -366,7 +366,7 @@ if method_external_curve and 'result_df' in locals() and result_df is not None a
                     mass = conc * v_extract
 
                     df_result.at[idx, "c(X) / µg/L"] = conc
-                    df_result.at[idx, "m(X) / ng"] = mass
+                    df_result.at[idx, "Маса (ng)"] = mass
 
         return df_result
 
@@ -396,10 +396,10 @@ if method_external_curve and 'result_df' in locals() and result_df is not None a
         summary_data = []
         for name in all_names:
             row = {"Name": name}
-            blank_mass = blank_final[blank_final["Name"] == name]["m(X) / ng"].sum()
+            blank_mass = blank_final[blank_final["Name"] == name]["Маса (ng)"].sum()
             row["Blank"] = blank_mass
             for i, df_s in enumerate(samples_final):
-                sample_mass = df_s[df_s["Name"] == name]["m(X) / ng"].sum()
+                sample_mass = df_s[df_s["Name"] == name]["Маса (ng)"].sum()
                 row[f"Sample {i + 1}"] = sample_mass
             summary_data.append(row)
 
@@ -553,7 +553,7 @@ if method_internal_curve and result_df is not None and std_concentrations:
                     "H(X)/H(IS)": hx_over_his,
                     "C(X)/C(IS)": cx_over_cis,
                     "C(X)": cx,
-                    "Final Amount": final_amt
+                    "Маса (ng)": final_amt
                 }
 
                 if sample_id == "Blank":
@@ -589,7 +589,7 @@ if method_internal_curve and result_df is not None and std_concentrations:
                     row = {"Name": name}
 
                     # Blank
-                    blank_mass = df_blank_results[df_blank_results["Name"] == name]["Final Amount"].sum()
+                    blank_mass = df_blank_results[df_blank_results["Name"] == name]["Маса (ng)"].sum()
                     row["Blank"] = blank_mass
 
                     # Секој sample
@@ -597,7 +597,7 @@ if method_internal_curve and result_df is not None and std_concentrations:
                         val = df_samples_results[
                             (df_samples_results["Name"] == name) & 
                             (df_samples_results["Sample ID"] == sid)
-                        ]["Final Amount"].sum()
+                        ]["Маса (ng)"].sum()
                         row[sid] = val
 
                     summary_rows.append(row)
@@ -646,11 +646,11 @@ if 'df_blank_processed' in locals() and df_blank_processed is not None:
 if 'blank_final' in locals() and blank_final is not None:
     for name in blank_final["Name"].unique():
         all_names.add(name)
-        summary_all_methods.setdefault(name, {})["Blank (Метод 2)"] = blank_final[blank_final["Name"] == name]["m(X) / ng"].sum()
+        summary_all_methods.setdefault(name, {})["Blank (Метод 2)"] = blank_final[blank_final["Name"] == name]["Маса (ng)"].sum()
     for i, df_sample in enumerate(samples_final):
         for name in df_sample["Name"].unique():
             all_names.add(name)
-            summary_all_methods.setdefault(name, {})[f"Sample {i+1} (Метод 2)"] = df_sample[df_sample["Name"] == name]["m(X) / ng"].sum()
+            summary_all_methods.setdefault(name, {})[f"Sample {i+1} (Метод 2)"] = df_sample[df_sample["Name"] == name]["Маса (ng)"].sum()
 
 # 3. Метод: Внатрешна калибрација
 if 'df_blank_results' in locals() and not df_blank_results.empty and 'df_samples_results' in locals() and not df_samples_results.empty:
@@ -658,12 +658,12 @@ if 'df_blank_results' in locals() and not df_blank_results.empty and 'df_samples
         sample_ids = df_samples_results["Sample ID"].unique()
         for name in df_blank_results["Name"].unique():
             all_names.add(name)
-            summary_all_methods.setdefault(name, {})["Blank (Метод 3)"] = df_blank_results[df_blank_results["Name"] == name]["Final Amount"].sum()
+            summary_all_methods.setdefault(name, {})["Blank (Метод 3)"] = df_blank_results[df_blank_results["Name"] == name]["Маса (ng)"].sum()
         for sid in sample_ids:
             df_sid = df_samples_results[df_samples_results["Sample ID"] == sid]
             for name in df_sid["Name"].unique():
                 all_names.add(name)
-                value = df_sid[df_sid["Name"] == name]["Final Amount"].sum()
+                value = df_sid[df_sid["Name"] == name]["Маса (ng)"].sum()
                 summary_all_methods.setdefault(name, {})[f"{sid} (Метод 3)"] = value
 
 # --- Формирање финална табела ---
