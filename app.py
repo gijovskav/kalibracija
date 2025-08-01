@@ -173,6 +173,9 @@ else:
     st.info("ℹ️ Стандардните податоци не се валидни или недостасуваат колони 'Name' и 'RRF'.")
     df_sample['RRF'] = None
 
+
+
+
    def process_sample(df_sample, df_std, c_is_start, v_extract, is_name):
     # Пресметка на c(X)
     df_sample['c(X) / µg L-1'] = df_sample.apply(lambda row: 
