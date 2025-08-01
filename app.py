@@ -433,39 +433,30 @@ if method_external_curve and 'result_df' in locals() and result_df is not None a
 
 
 
-#INTERNA
-# Осигурај се дека result_df и std_concentrations се дефинирани
-if 'result_df' not in locals():
-    result_df = None
-if 'std_concentrations' not in locals():
-    std_concentrations = []
-
-# Внатрешна калибрација со крива - извршување само ако се вклучи оваа опција
 if method_internal_curve and result_df is not None and std_concentrations:
 
     # 1. Пресметај C(X)/C(IS) регресија базирана на H(X)/H(IS)
     std_conc_norm = np.array(std_concentrations) / std_concentrations[0]
     std_conc_norm = std_conc_norm.reshape(-1, 1)
 
-# Подготви ratio_df = H(X)/H(IS) за секој стандард
-ratio_df = result_df[["Name"]].copy()
-height_cols = [col for col in result_df.columns if col.startswith("Height_")]
+    # Подготви ratio_df = H(X)/H(IS) за секој стандард
+    ratio_df = result_df[["Name"]].copy()
+    height_cols = [col for col in result_df.columns if col.startswith("Height_")]
 
-for idx, col in enumerate(height_cols):
-    df_std = std_dataframes[idx]  # земи го соодветниот стандард
-    is_row = df_std[df_std[name_col] == is_name]
+    for idx, col in enumerate(height_cols):
+        df_std = std_dataframes[idx]  # земи го соодветниот стандард
+        is_row = df_std[df_std[name_col] == is_name]
 
-    if not is_row.empty:
-        is_height = is_row[height_col_base].values[0]
-        if pd.notna(is_height) and is_height != 0:
-            ratio_df[f"Ratio_{col.split('_')[-1]}"] = result_df[col] / is_height
+        if not is_row.empty:
+            is_height = is_row[height_col_base].values[0]
+            if pd.notna(is_height) and is_height != 0:
+                ratio_df[f"Ratio_{col.split('_')[-1]}"] = result_df[col] / is_height
+            else:
+                st.warning(f"⚠️ Висината за IS ({is_name}) во стандард {idx+1} не е валидна: {is_height}")
+                ratio_df[f"Ratio_{col.split('_')[-1]}"] = np.nan
         else:
-            st.warning(f"⚠️ Висината за IS ({is_name}) во стандард {idx+1} не е валидна: {is_height}")
+            st.warning(f"⚠️ IS '{is_name}' не е пронајден во стандард {idx+1}.")
             ratio_df[f"Ratio_{col.split('_')[-1]}"] = np.nan
-    else:
-        st.warning(f"⚠️ IS '{is_name}' не е пронајден во стандард {idx+1}.")
-        ratio_df[f"Ratio_{col.split('_')[-1]}"] = np.nan
-
 
     # Ако успешно се пресметани односите, продолжи со регресија
     if ratio_df is not None:
@@ -497,6 +488,8 @@ for idx, col in enumerate(height_cols):
         df_c_over_cis = pd.DataFrame(regression_results)
         st.markdown("### Внатрешна калибрациона права")
         st.dataframe(df_c_over_cis)
+
+        # ... продолжи понатаму со останатиот код исто *внатре* во условот
 
         # 2. Примени ги регресиите на бланкови и семплови
         all_samples = []
