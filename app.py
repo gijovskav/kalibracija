@@ -628,77 +628,65 @@ if method_internal_curve and result_df is not None and std_concentrations:
 
 
 #krajna tabela
-# --- Безбедно земање имиња од стандард ---
-std_names = []
+import pandas as pd
+import re
+import streamlit as st
 
-if method_one_point and not (method_internal_curve or method_external_curve):
-    if 'df_std' in locals() and isinstance(df_std, pd.DataFrame) and 'Name' in df_std.columns:
-        df_std['Name'] = df_std['Name'].astype(str).str.strip().str.lower()
-        std_names = df_std['Name'].dropna().unique().tolist()
-else:
-    combined_std_df = pd.concat(std_dataframes, ignore_index=True) if std_dataframes else pd.DataFrame()
-    if not combined_std_df.empty and 'Name' in combined_std_df.columns:
-        combined_std_df['Name'] = combined_std_df['Name'].astype(str).str.strip().str.lower()
-        std_names = combined_std_df['Name'].dropna().unique().tolist()
-
-
-
-# --- Почетна табела само со имињата од стандардот ---
-# --- Безбедно земање имиња од стандард ---
-std_names = []
-
-if method_one_point and not (method_internal_curve or method_external_curve):
-    if 'df_std' in locals() and isinstance(df_std, pd.DataFrame) and 'Name' in df_std.columns:
-        df_std['Name'] = df_std['Name'].astype(str).str.strip().str.lower()
-        std_names = df_std['Name'].dropna().unique().tolist()
-else:
-    combined_std_df = pd.concat(std_dataframes, ignore_index=True) if std_dataframes else pd.DataFrame()
-    if not combined_std_df.empty and 'Name' in combined_std_df.columns:
-        combined_std_df['Name'] = combined_std_df['Name'].astype(str).str.strip().str.lower()
-        std_names = combined_std_df['Name'].dropna().unique().tolist()
-
-# --- Почетна табела само со имињата од стандардот ---
-df_combined = pd.DataFrame({'Name': sorted(std_names)})
-
-# --- Функција за нормализација на имињата ---
+# --- Функција за нормализација на 'Name' колона ---
 def normalize_name_column(df):
     df = df.copy()
     if 'Name' in df.columns:
         df['Name'] = df['Name'].astype(str).str.strip().str.lower()
     return df
 
-# --- Подготовка на табелите за спојување ---
+# --- Земи ги имињата од стандардните DataFrame-ови ---
+std_names = []
+
+if method_one_point and not (method_internal_curve or method_external_curve):
+    if 'df_std' in locals() and isinstance(df_std, pd.DataFrame) and 'Name' in df_std.columns:
+        df_std['Name'] = df_std['Name'].astype(str).str.strip().str.lower()
+        std_names = df_std['Name'].dropna().unique().tolist()
+else:
+    combined_std_df = pd.concat(std_dataframes, ignore_index=True) if std_dataframes else pd.DataFrame()
+    if not combined_std_df.empty and 'Name' in combined_std_df.columns:
+        combined_std_df['Name'] = combined_std_df['Name'].astype(str).str.strip().str.lower()
+        std_names = combined_std_df['Name'].dropna().unique().tolist()
+
+# --- Почетна табела со имиња од стандардот ---
+df_combined = pd.DataFrame({'Name': sorted(std_names)})
+
+# --- Подготовка на листа со DataFrame-ови за спојување ---
 dfs_to_merge = []
 
-# One Point Method
+# Вметни го One Point
 summary = locals().get('summary')
 if isinstance(summary, pd.DataFrame) and not summary.empty:
     df_1p = normalize_name_column(summary)
     df_1p = df_1p.rename(columns=lambda c: f"{c} (One Point)" if c != 'Name' else c)
     dfs_to_merge.append(df_1p)
 
-# Internal Curve Method
+# Вметни го Internal Curve
 df_summary_internal = locals().get('df_summary')
 if isinstance(df_summary_internal, pd.DataFrame) and not df_summary_internal.empty:
     df_internal = normalize_name_column(df_summary_internal)
     df_internal = df_internal.rename(columns=lambda c: f"{c} (Internal Curve)" if c != 'Name' else c)
     dfs_to_merge.append(df_internal)
 
-# External Curve Method
+# Вметни го External Curve
 df_summary_external = locals().get('df_summary_external')
 if isinstance(df_summary_external, pd.DataFrame) and not df_summary_external.empty:
     df_external = normalize_name_column(df_summary_external)
     df_external = df_external.rename(columns=lambda c: f"{c} (External Curve)" if c != 'Name' else c)
     dfs_to_merge.append(df_external)
 
-# --- Спојување според 'Name' ---
+# --- Спојување според 'Name' колона ---
 for df_method in dfs_to_merge:
     df_combined = df_combined.merge(df_method, on='Name', how='left')
 
-# --- Пополнување со 0 ---
+# --- Пополнување празни вредности со 0 ---
 df_combined = df_combined.fillna(0)
 
-# --- Прикажи комбинована табела ---
+# --- Прикажи ја комбинованата табела со сите методи ---
 st.markdown("### Комбинирана сумирана табела за сите методи и samples:")
 st.dataframe(df_combined)
 
@@ -708,15 +696,16 @@ df_corrected = df_combined.copy()
 methods = ['One Point', 'Internal Curve', 'External Curve']
 
 for method in methods:
-    # Наоѓање на колоните за sample и blank за конкретниот метод
-    sample_cols = [col for col in df_corrected.columns if re.match(rf".*sample\s*\d+\s*\({method}\)", col, flags=re.IGNORECASE)]
-    blank_col = next((col for col in df_corrected.columns if re.match(rf".*blank.*\({method}\)", col, flags=re.IGNORECASE)), None)
+    # Наоѓање sample колони (пример: sample 1 (One Point))
+    sample_cols = [col for col in df_corrected.columns if re.search(rf"sample\s*\d+\s*\({method}\)", col, flags=re.IGNORECASE)]
+    # Наоѓање blank колона (пример: blank (One Point))
+    blank_col = next((col for col in df_corrected.columns if re.search(rf"blank\s*\({method}\)", col, flags=re.IGNORECASE)), None)
 
     if not blank_col:
-        # Ако нема blank колона за методот, прескокни го
-        continue
+        continue  # ако нема blank колона за овој метод, прескокни
 
     for sample_col in sample_cols:
+        # Извлечи бројка од sample колона
         match = re.search(r'sample\s*(\d+)', sample_col, flags=re.IGNORECASE)
         if not match:
             continue
@@ -724,11 +713,11 @@ for method in methods:
         new_col = f"Sample {sample_num} - Blank ({method})"
         df_corrected[new_col] = df_corrected[sample_col] - df_corrected[blank_col]
 
-# --- Избор само на новите колони и 'Name' ---
+# --- Изберете само колони со одземени blank вредности и 'Name' ---
 result_cols = ['Name'] + [col for col in df_corrected.columns if ' - Blank (' in col]
 df_final = df_corrected[result_cols].copy()
 
-# --- Прикажи финална табела ---
+# --- Прикажи ја финалната табела со одземени blank вредности ---
 st.markdown("### Финална компаративна табела со едноставно одземени blank вредности:")
 st.dataframe(df_final)
 
@@ -774,4 +763,5 @@ df_final = df_corrected[result_cols].copy()
 # --- Прикажи резултат ---
 st.markdown("### Финална компаративна табела со едноставно одземени blank вредности:")
 st.dataframe(df_final)
+
 
