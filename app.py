@@ -627,6 +627,25 @@ if method_internal_curve and result_df is not None and std_concentrations:
 
 
 
+
+st.markdown("### Debug: Стандардни имиња")
+st.write(std_names)
+
+if isinstance(summary, pd.DataFrame):
+    st.markdown("### Debug: One Point `Name`")
+    st.write(summary['Name'].dropna().unique())
+
+if isinstance(df_summary, pd.DataFrame):
+    st.markdown("### Debug: Internal Curve `Name`")
+    st.write(df_summary['Name'].dropna().unique())
+
+if isinstance(df_summary_external, pd.DataFrame):
+    st.markdown("### Debug: External Curve `Name`")
+    st.write(df_summary_external['Name'].dropna().unique())
+
+
+
+
 #krajna tabela
 # --- Безбедно земање имиња од стандард ---
 if method_one_point and not (method_internal_curve or method_external_curve):
@@ -680,3 +699,4 @@ df_combined = df_combined.fillna(0)
 # --- Прикажи резултат ---
 st.markdown("### Комбинирана сумирана табела за сите методи и samples:")
 st.dataframe(df_combined)
+
