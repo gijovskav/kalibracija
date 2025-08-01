@@ -463,7 +463,7 @@ if not is_row.empty:
         else:
             st.warning(f"⚠️ Висината за IS ({is_name}) не е валидна: {is_height}")
             ratio_df = None
-    else:
+        else:
         st.warning(f"⚠️ IS '{is_name}' не е пронајден во првиот стандард.")
         ratio_df = None
 
