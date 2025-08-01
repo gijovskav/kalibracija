@@ -691,19 +691,14 @@ st.dataframe(df_combined)
 
 
 #odzemanja
-# Прво, нормализирај го 'Name' (стандарден) ако треба, и филтрирај празни
+# 1. Нормализирање на 'Name'
 df_combined['Name'] = df_combined['Name'].astype(str).str.strip().str.lower()
 
-# Пример за колони:
-# Name, sample1 (One Point), blank (One Point), sample2 (One Point), ..., sample1 (Internal Curve), blank (Internal Curve), ...
-
-# 1. Ќе го извадам името на методите и sample-ите од колоните
+# 2. Подготовка за групирање по метод и sample
 cols = df_combined.columns.tolist()
 cols.remove('Name')
 
-# Функција да се извлече sample и метод од име на колона
 def parse_col(col_name):
-    # Пример: "sample1 (One Point)" -> ("sample1", "One Point")
     if '(' in col_name and ')' in col_name:
         sample = col_name.split('(')[0].strip()
         method = col_name.split('(')[1].strip(')')
@@ -711,7 +706,6 @@ def parse_col(col_name):
     else:
         return col_name, ''
 
-# Групирање по метод
 method_samples = {}
 for col in cols:
     sample, method = parse_col(col)
@@ -719,39 +713,29 @@ for col in cols:
         method_samples[method] = []
     method_samples[method].append((sample, col))
 
-# 2. За секој метод ќе ги одземеме вредностите од blank sample
+# 3. Финална табела каде ќе ги ставиме податоците со одземен blank
 df_final = pd.DataFrame()
 df_final['Name'] = df_combined['Name']
 
 for method, samples_cols in method_samples.items():
-    # Наоѓаме колона со blank sample
     blank_col = None
     for sample, col in samples_cols:
         if sample.lower() == 'blank':
             blank_col = col
             break
-    
-    # Ако има blank
+
     if blank_col:
-        # Одземање на blank од останатите sample (освен blank сама)
         for sample, col in samples_cols:
             if sample.lower() != 'blank':
                 new_col_name = f"{sample} ({method})"
                 df_final[new_col_name] = df_combined[col] - df_combined[blank_col]
     else:
-        # Ако нема blank, само копирај ги колоните
         for sample, col in samples_cols:
             new_col_name = f"{sample} ({method})"
             df_final[new_col_name] = df_combined[col]
 
-df_internal_final = df_internal_final[ordered_cols]
 
-# 5. Прикажи финалната табела
+
+# 5. Прикажување во Streamlit
 st.markdown("### Финална табела за Internal Curve (одземен blank):")
 st.dataframe(df_internal_final)
-
-
-
-
-
-
