@@ -722,17 +722,15 @@ st.dataframe(df_final)
 #odzemanja
 import re
 
-# --- Претпоставуваме дека df_combined е веќе подготвен како првата голема табела ---
-# df_combined = ...
-
 df_corrected = df_combined.copy()
 
-# --- Методите што ги бараме ---
 methods = ['One Point', 'Internal Curve', 'External Curve']
 
 for method in methods:
-    # --- Најди ги сите колони од типот Sample n за дадениот метод ---
+    # Наоѓање sample колони (пример: sample 1 (One Point))
     sample_cols = [col for col in df_corrected.columns if re.match(rf".*sample\s*\d+\s*\({method}\)", col, flags=re.IGNORECASE)]
+    
+    # Наоѓање blank колона (пример: blank (One Point))
     blank_col = next((col for col in df_corrected.columns if re.match(rf".*blank.*\({method}\)", col, flags=re.IGNORECASE)), None)
 
     if not blank_col:
@@ -751,13 +749,14 @@ for method in methods:
         # Пресметај разлика
         df_corrected[new_col] = df_corrected[sample_col] - df_corrected[blank_col]
 
-# --- Само новите колони ги вадиме + името ---
+# Избери само новите колони + 'Name'
 result_cols = ['Name'] + [col for col in df_corrected.columns if ' - Blank (' in col]
 df_final = df_corrected[result_cols].copy()
 
-# --- Прикажи резултат ---
 st.markdown("### Финална компаративна табела со едноставно одземени blank вредности:")
 st.dataframe(df_final)
+
+
 
 
 
