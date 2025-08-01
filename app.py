@@ -279,6 +279,98 @@ if std_dataframes:
 
 
 
+#EKSTERNA KALIBRACIJA
+if method_external_curve and 'result_df' in locals() and result_df is not None and std_concentrations:
+    calibration_data = []
+
+    X_full = np.array(std_concentrations).reshape(-1, 1)
+
+    df_blank_processed = None
+    if blank_file is not None:
+        df_blank_processed = pd.read_excel(blank_file)
+
+    sample_tables = []
+    if sample_files:
+        for f in sample_files:
+            sample_tables.append(pd.read_excel(f))
+
+
+
+
+
+
+        # Филтрирање на колоните што се само Height_X
+        height_columns = [col for col in result_df.columns if col.startswith("Height_")]
+
+        for index, row in result_df.iterrows():
+            name = row["Name"]
+            heights = row[height_columns].values
+
+            # Комбинирај ги само валидните парови
+            valid_pairs = [(x, y) for x, y in zip(std_concentrations, heights) if pd.notna(y)]
+
+            if len(valid_pairs) < 2:
+                continue
+
+            x_vals, y_vals = zip(*valid_pairs)
+            X = np.array(x_vals).reshape(-1, 1)
+            y = np.array(y_vals).reshape(-1, 1)
+
+            model = LinearRegression()
+            model.fit(X, y)
+
+            slope = float(model.coef_)
+            intercept = float(model.intercept_)
+            r2 = float(model.score(X, y))
+
+            calibration_data.append({
+                "Name": name,
+                "Slope": slope,
+                "Intercept": intercept,
+                "Correlation (R²)": r2
+            })
+
+        df_calibration = pd.DataFrame(calibration_data)
+
+        if not df_calibration.empty:
+            st.write("### Калибрациона права за надворешна калибрација:")
+            st.dataframe(df_calibration)
+        else:
+            st.warning("⚠️ Нема доволно податоци за да се изврши калибрација.")
+
+    else:
+        st.warning("Нема податоци за резултат или стандардни концентрации за калкулација.")
+
+
+
+    def calculate_concentration_and_mass(df, df_calib, v_extract):
+        df_result = df.copy()
+        df_result["c(X) / µg/L"] = None
+        df_result["m(X) / ng"] = None
+
+        for idx, row in df_result.iterrows():
+            name = row.get("Name")
+            height = row.get("Height") or row.get("Height (Hz)") or row.get("height")
+
+            if pd.isna(height):
+                continue
+
+            calib_row = df_calib[df_calib["Name"] == name]
+            if not calib_row.empty:
+                slope = calib_row["Slope"].values[0]
+                intercept = calib_row["Intercept"].values[0]
+
+                if slope != 0:
+                    conc = (height - intercept) / slope
+                    mass = conc * v_extract
+
+                    df_result.at[idx, "c(X) / µg/L"] = conc
+                    df_result.at[idx, "m(X) / ng"] = mass
+
+        return df_result
+
+
+
     # --- Пример за blank обработка ---
 if blank_file is not None and std_dataframes and is_name:
     blank_df = pd.read_excel(blank_file)
