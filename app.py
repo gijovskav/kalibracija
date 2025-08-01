@@ -446,8 +446,12 @@ if method_internal_curve and result_df is not None and std_concentrations:
 
     # Подготви ratio_df = H(X)/H(IS) за секој стандард
     ratio_df = result_df[["Name"]].copy()
-    df_std_first = std_dataframes[0]
-    is_row = df_std_first[df_std_first[name_col] == is_name]
+    sample_conc = row["Concentration"]  # замени ако имаш друго име за концентрацијата
+df_std_match = next(
+    (df_std for df_std in std_dataframes if sample_conc in df_std["Concentration"].values),
+    None
+)
+is_row = df_std_match[df_std_match[name_col] == is_name] if df_std_match is not None else pd.DataFrame()
 
     if not is_row.empty:
         is_height = is_row[height_col_base].values[0]
