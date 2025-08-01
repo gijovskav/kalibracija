@@ -4,6 +4,7 @@ import numpy as np
 from sklearn.linear_model import LinearRegression
 import io
 from io import BytesIO
+import re
 
 
 df_std = None
@@ -628,9 +629,6 @@ if method_internal_curve and result_df is not None and std_concentrations:
 
 
 #krajna tabela
-import pandas as pd
-import re
-import streamlit as st
 
 # --- Функција за нормализација на 'Name' колона ---
 def normalize_name_column(df):
@@ -665,14 +663,21 @@ if isinstance(summary, pd.DataFrame) and not summary.empty:
     df_1p = df_1p.rename(columns=lambda c: f"{c} (One Point)" if c != 'Name' else c)
     dfs_to_merge.append(df_1p)
 
-
-
 # Вметни го External Curve
 df_summary = locals().get('df_summary')
 if isinstance(df_summary, pd.DataFrame) and not df_summary.empty:
     df_external = normalize_name_column(df_summary)
     df_external = df_external.rename(columns=lambda c: f"{c} (External Curve)" if c != 'Name' else c)
     dfs_to_merge.append(df_external)
+
+# Вметни го Internal Curve
+summary_data = locals().get('summary_data')
+if isinstance(summary_data, pd.DataFrame) and not summary_data.empty:
+    df_internal = normalize_name_column(summary_data)
+    df_internal = df_internal.rename(columns=lambda c: f"{c} (Internal Curve)" if c != 'Name' else c)
+    dfs_to_merge.append(df_internal)
+
+
 
 # --- Спојување според 'Name' колона ---
 for df_method in dfs_to_merge:
@@ -684,37 +689,6 @@ df_combined = df_combined.fillna(0)
 # --- Прикажи ја комбинованата табела со сите методи ---
 st.markdown("### Комбинирана сумирана табела за сите методи и samples:")
 st.dataframe(df_combined)
-
-# --- Одземање на blank вредности ---
-df_corrected = df_combined.copy()
-
-methods = ['One Point', 'Internal Curve', 'External Curve']
-
-for method in methods:
-    # Наоѓање sample колони (пример: sample 1 (One Point))
-    sample_cols = [col for col in df_corrected.columns if re.search(rf"sample\s*\d+\s*\({method}\)", col, flags=re.IGNORECASE)]
-    # Наоѓање blank колона (пример: blank (One Point))
-    blank_col = next((col for col in df_corrected.columns if re.search(rf"blank\s*\({method}\)", col, flags=re.IGNORECASE)), None)
-
-    if not blank_col:
-        continue  # ако нема blank колона за овој метод, прескокни
-
-    for sample_col in sample_cols:
-        # Извлечи бројка од sample колона
-        match = re.search(r'sample\s*(\d+)', sample_col, flags=re.IGNORECASE)
-        if not match:
-            continue
-        sample_num = match.group(1)
-        new_col = f"Sample {sample_num} - Blank ({method})"
-        df_corrected[new_col] = df_corrected[sample_col] - df_corrected[blank_col]
-
-# --- Изберете само колони со одземени blank вредности и 'Name' ---
-result_cols = ['Name'] + [col for col in df_corrected.columns if ' - Blank (' in col]
-df_final = df_corrected[result_cols].copy()
-
-# --- Прикажи ја финалната табела со одземени blank вредности ---
-st.markdown("### Финална компаративна табела со едноставно одземени blank вредности:")
-st.dataframe(df_final)
 
 
 
@@ -755,6 +729,7 @@ df_final = df_corrected[result_cols].copy()
 
 st.markdown("### Финална компаративна табела со едноставно одземени blank вредности:")
 st.dataframe(df_final)
+
 
 
 
