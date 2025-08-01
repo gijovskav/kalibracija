@@ -453,7 +453,7 @@ df_std_match = next(
 )
 is_row = df_std_match[df_std_match[name_col] == is_name] if df_std_match is not None else pd.DataFrame()
 
-    if not is_row.empty:
+if not is_row.empty:
         is_height = is_row[height_col_base].values[0]
 
         if pd.notna(is_height) and is_height != 0:
