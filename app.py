@@ -628,9 +628,17 @@ if method_internal_curve and result_df is not None and std_concentrations:
 
 
 #krajna tabela
+if method_one_point and not (method_internal_curve or method_external_curve):
+    std_names = df_std['Name'].unique()
+else:
+    # Комбинирај ги сите std dataframe-ови во една табела па извлечи уникатни имиња
+    combined_std_df = pd.concat(std_dataframes, ignore_index=True) if std_dataframes else pd.DataFrame()
+    if not combined_std_df.empty and 'Name' in combined_std_df.columns:
+        std_names = combined_std_df['Name'].unique()
+    else:
+        std_names = []
 
-#krajna tabela
-import pandas as pd
+df_combined = pd.DataFrame({'Name': std_names})
 
 # Проверка кои табели се достапни
 dfs_to_merge = []
@@ -674,113 +682,3 @@ df_combined = df_combined.fillna(0)
 st.markdown("### Комбинирана сумирана табела за сите методи и samples:")
 st.dataframe(df_combined)
 
-
-
-
-#ovaa so odzemeni blank
-import pandas as pd
-
-# df_combined е табелата што ја имаш (со Blank и Sample колони за сите методи)
-
-df_subtracted = df_combined[['Name']].copy()
-
-# Функција која ќе најде за еден метод колоните на Blank и Samples
-def subtract_blank_from_samples(df, method_label):
-    # Наоѓаме колоните што се од методот (One Point, Internal Curve, External Curve)
-    cols = [col for col in df.columns if method_label in col]
-    blank_col = None
-    sample_cols = []
-    for col in cols:
-        if col.startswith('Blank'):
-            blank_col = col
-        else:
-            sample_cols.append(col)
-    return blank_col, sample_cols
-
-# Список на методи што ги имаш (претпоставено од твоите ознаки)
-methods = ['One Point', 'Internal Curve', 'External Curve']
-
-for method in methods:
-    blank_col, sample_cols = subtract_blank_from_samples(df_combined, method)
-    if blank_col is None:
-        # Ако нема blank за методот, тогаш ги копираме sample колоните како се
-        for col in sample_cols:
-            df_subtracted[col] = df_combined[col]
-    else:
-        for col in sample_cols:
-            # Одземаме blank од sample (и ако има NaN заменуваме со 0)
-            df_subtracted[col] = df_combined[col].fillna(0) - df_combined[blank_col].fillna(0)
-
-# Покажи ја новата табела
-st.markdown("### Сумарна табела - Samples со одземен Blank по методи")
-st.dataframe(df_subtracted)
-
-# --- Собирање на сите имиња од стандардниот фајл ---
-if method_one_point and not (method_internal_curve or method_external_curve):
-    std_df = pd.read_excel(std_file_one_point)
-    all_names = std_df['Name'].unique()
-else:
-    all_names = set()
-    for df in std_dataframes:
-        all_names.update(df['Name'].unique())
-    all_names = list(all_names)
-all_names = sorted(all_names)
-
-# --- Помошна функција за конвертирање во уреден формат (method, sample) ---
-def reshape_summary(df, method_name):
-    melted = df.melt(id_vars=['Name'], var_name='Колона', value_name='Маса (ng)')
-    melted['Тип'] = melted['Колона'].apply(lambda x: 'Blank' if 'Blank' in x else f"Sample {x.split()[-1]}")
-    melted['Метод'] = method_name
-    return melted[['Name', 'Тип', 'Метод', 'Маса (ng)']]
-
-# --- Подготовка на поединечните reshape-ирани табели ---
-combined_rows = []
-
-if 'summary' in locals():
-    combined_rows.append(reshape_summary(summary, 'Една точка'))
-if 'df_summary' in locals():
-    combined_rows.append(reshape_summary(df_summary, 'Надворешна'))
-if 'df_summary_internal' in locals():
-    combined_rows.append(reshape_summary(df_summary_internal, 'Внатрешна'))
-
-# --- Комбинирана табела со сите методи и сите примероци ---
-if combined_rows:
-    df_combined = pd.concat(combined_rows, ignore_index=True)
-
-    # Осигурување дека ги имаме сите 36 Name вредности
-    df_combined = df_combined.set_index('Name')
-    df_combined = df_combined.reindex(all_names, level=0).reset_index()
-
-    # Пренаредување: Name | Blank (по метод) | Sample 1 (по метод) ...
-    df_pivot = df_combined.pivot_table(index='Name', columns=['Тип', 'Метод'], values='Маса (ng)', fill_value=0)
-    df_pivot.columns = [f"{col[0]} - {col[1]}" for col in df_pivot.columns]
-    df_pivot = df_pivot.reset_index()
-
-    st.markdown("### 🔬 Сумарна табела со сите методи и сите примероци")
-    st.dataframe(df_pivot)
-
-    # --- Сумирана табела со одземен blank по метод ---
-    df_blank_values = df_combined[df_combined['Тип'] == 'Blank'].set_index(['Name', 'Метод'])['Маса (ng)']
-    df_subtracted = []
-
-    for _, row in df_combined.iterrows():
-        if row['Тип'] == 'Blank' or pd.isna(row['Маса (ng)']):
-            continue
-        blank_val = df_blank_values.get((row['Name'], row['Метод']), 0)
-        diff = row['Маса (ng)'] - blank_val
-        df_subtracted.append({
-            'Name': row['Name'],
-            'Тип': row['Тип'],
-            'Метод': row['Метод'],
-            'Маса (ng)': diff
-        })
-
-    df_subtracted = pd.DataFrame(df_subtracted)
-    df_subtracted = df_subtracted.set_index('Name')
-    df_subtracted = df_subtracted.reindex(all_names, level=0).reset_index()
-    df_sub_pivot = df_subtracted.pivot_table(index='Name', columns=['Тип', 'Метод'], values='Маса (ng)', fill_value=0)
-    df_sub_pivot.columns = [f"{col[0]} - {col[1]}" for col in df_sub_pivot.columns]
-    df_sub_pivot = df_sub_pivot.reset_index()
-
-    st.markdown("### 🔬 Сумарна табела со одземен Blank (по метод)")
-    st.dataframe(df_sub_pivot)
