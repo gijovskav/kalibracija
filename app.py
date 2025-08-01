@@ -744,6 +744,12 @@ for method, samples_cols in method_samples.items():
             new_col_name = f"{sample} ({method})"
             df_final[new_col_name] = df_combined[col]
 
+df_internal_final = df_internal_final[ordered_cols]
+
+# 5. Прикажи финалната табела
+st.markdown("### Финална табела за Internal Curve (одземен blank):")
+st.dataframe(df_internal_final)
+
 
 
 
