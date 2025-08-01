@@ -632,91 +632,56 @@ import pandas as pd
 from io import BytesIO
 
 # --- КОМПАРАТИВНА СУМАРНА ТАБЕЛА ЗА СИТЕ МЕТОДИ ---
-summary_all_methods = {}
-all_names = set()
+# Функција за извлекување на уникатни имиња од стандарден документ
+def extract_names_from_std(df_std, col_name="Name"):
+    if col_name in df_std.columns:
+        return df_std[col_name].dropna().unique().tolist()
+    else:
+        return []
 
-# Метод 1: df_blank_processed и sample_tables (секоја sample одделно)
-if 'df_blank_processed' in locals() and df_blank_processed is not None:
-    for name in df_blank_processed["Name"].unique():
-        all_names.add(name)
-        blank_sum = df_blank_processed[df_blank_processed["Name"] == name]["Маса (ng)"].sum()
-        summary_all_methods.setdefault(name, {})["Blank (Метод 1)"] = blank_sum
+# --- Во твојот код, после вчитување на стандарден документ ---
 
-    if 'sample_tables' in locals() and sample_tables:
-        for i, df_sample in enumerate(sample_tables):
-            for name in df_sample["Name"].unique():
-                all_names.add(name)
-                sample_sum = df_sample[df_sample["Name"] == name]["Маса (ng)"].sum()
-                summary_all_methods.setdefault(name, {})[f"Sample {i+1} (Метод 1)"] = sample_sum
+if method_one_point:
+    if std_file_one_point is not None:
+        df_std = pd.read_excel(std_file_one_point)
+        names_list = extract_names_from_std(df_std, col_name="Name")
+else:
+    # Кога е друг метод
+    if uploaded_std_files:
+        df_std_first = pd.read_excel(uploaded_std_files[0])
+        names_list = extract_names_from_std(df_std_first, col_name="Name")
+    else:
+        names_list = []
 
-# Метод 2: blank_final и samples_final (секоја sample одделно)
-if 'blank_final' in locals() and blank_final is not None:
-    for name in blank_final["Name"].unique():
-        all_names.add(name)
-        blank_sum = blank_final[blank_final["Name"] == name]["Маса (ng)"].sum()
-        summary_all_methods.setdefault(name, {})["Blank (Метод 2)"] = blank_sum
+# Сега да ги споиме податоците од blank и sample табелите (кои претходно ги обработи)
 
-    if 'samples_final' in locals() and samples_final:
-        for i, df_sample in enumerate(samples_final):
-            for name in df_sample["Name"].unique():
-                all_names.add(name)
-                sample_sum = df_sample[df_sample["Name"] == name]["Маса (ng)"].sum()
-                summary_all_methods.setdefault(name, {})[f"Sample {i+1} (Метод 2)"] = sample_sum
+# df_blank_processed и sample_tables се dataframe-ови кои ги добиваш од process_sample
 
-# Метод 3: Внатрешна калибрација - df_blank_results и df_samples_results (се во една табела со Sample ID)
-if 'df_blank_results' in locals() and df_blank_results is not None and not df_blank_results.empty and \
-   'df_samples_results' in locals() and df_samples_results is not None and not df_samples_results.empty:
+if df_blank_processed is not None and sample_tables and names_list:
+    # Правиме празен summary dataframe со уникатни имиња од стандарден документ
+    summary = pd.DataFrame({"Name": names_list})
 
-    # Blank (Метод 3)
-    for name in df_blank_results["Name"].unique():
-        all_names.add(name)
-        blank_sum = df_blank_results[df_blank_results["Name"] == name]["Маса (ng)"].sum()
-        summary_all_methods.setdefault(name, {})["Blank (Метод 3)"] = blank_sum
+    # Придружуваме blank маси
+    blank_mass = df_blank_processed.groupby("Name")["Маса (ng)"].sum().reset_index()
+    blank_mass.rename(columns={"Маса (ng)": "Маса (ng) Blank"}, inplace=True)
+    summary = summary.merge(blank_mass, on="Name", how="left")
 
-    # Samples (Метод 3)
-    sample_ids = df_samples_results["Sample ID"].unique()
-    for sid in sample_ids:
-        df_sid = df_samples_results[df_samples_results["Sample ID"] == sid]
-        for name in df_sid["Name"].unique():
-            all_names.add(name)
-            sample_sum = df_sid[df_sid["Name"] == name]["Маса (ng)"].sum()
-            summary_all_methods.setdefault(name, {})[f"{sid} (Метод 3)"] = sample_sum
+    # Придружуваме sample маси
+    for i, df_sample_proc in enumerate(sample_tables):
+        sample_mass = df_sample_proc.groupby("Name")["Маса (ng)"].sum().reset_index()
+        sample_mass.rename(columns={"Маса (ng)": f"Маса (ng) Sample {i + 1}"}, inplace=True)
+        summary = summary.merge(sample_mass, on="Name", how="left")
 
-# --- Формирање финална табела ---
-final_summary_rows = []
-for name in sorted(all_names):
-    row = {"Name": name}
-    row.update(summary_all_methods.get(name, {}))
-    final_summary_rows.append(row)
+    summary.fillna(0, inplace=True)
 
-df_comparative_summary = pd.DataFrame(final_summary_rows).fillna(0)
+    st.markdown("### Сумарна табела со сите маси:")
+    st.dataframe(summary)
 
-# --- Прикажи во Streamlit ---
-st.markdown("## 📊 Компаративна табела од сите методи")
-st.dataframe(df_comparative_summary)
+    # Табела со одземена blank маса (sample - blank)
+    corrected = summary.copy()
+    for col in summary.columns:
+        if col.startswith("Маса (ng) Sample"):
+            corrected[col] = corrected[col] - corrected["Маса (ng) Blank"]
 
-# --- Преземање како Excel ---
-excel_bytes = BytesIO()
-with pd.ExcelWriter(excel_bytes, engine="xlsxwriter") as writer:
-    df_comparative_summary.to_excel(writer, index=False, sheet_name="Сумирана компарација")
-st.download_button("⬇️ Преземи компаративна табела (Excel)", data=excel_bytes.getvalue(), file_name="komparacija_metodi.xlsx")
-
-# --- СУМАРНА ТАБЕЛА СО ОДЗЕМЕН BLANK ---
-summary_corrected = df_comparative_summary.copy()
-
-for index, row in summary_corrected.iterrows():
-    for col in summary_corrected.columns:
-        if col.startswith("Sample"):
-            method_id = col.split("(")[-1].strip(")")
-            blank_col = f"Blank ({method_id})"
-            if blank_col in summary_corrected.columns:
-                corrected_value = row[col] - row[blank_col]
-                summary_corrected.at[index, col] = max(corrected_value, 0)  # избегни негативни
-
-st.markdown("## 📉 Сумарна табела со одземен Blank")
-st.dataframe(summary_corrected)
-
-excel_corrected = BytesIO()
-with pd.ExcelWriter(excel_corrected, engine="xlsxwriter") as writer:
-    summary_corrected.to_excel(writer, index=False, sheet_name="Одземен Blank")
-st.download_button("⬇️ Преземи табела со одземен Blank (Excel)", data=excel_corrected.getvalue(), file_name="komparacija_minus_blank.xlsx")
+    st.markdown("### Сумарна табела со одземена Blank маса:")
+    st.dataframe(corrected)
