@@ -159,39 +159,25 @@ if method_one_point:
         # Генерира реден број
         df_sample.insert(0, "Ред. бр.", range(1, len(df_sample) + 1))
 
-if 'df_sample' not in locals():
-    df_sample = pd.DataFrame()
+# Наоѓање RRF од стандарди според Name
+        def get_rrf(name):
+            match = df_std[df_std['Name'] == name]
+            if not match.empty:
+                return match['RRF'].values[0]
+            else:
+                return None
 
-if 'df_std' not in locals():
-    df_std = pd.DataFrame()
+        df_sample['RRF'] = df_sample['Name'].apply(get_rrf)
 
-# Безбедно наоѓање RRF од стандарди според Name
-if df_std is not None and not df_std.empty and 'Name' in df_std.columns and 'RRF' in df_std.columns:
-    def get_rrf(name):
-        match = df_std[df_std['Name'] == name]
-        if not match.empty:
-            return match['RRF'].values[0]
-        else:
-            return None
+        # Пресметка на c(X)
+        df_sample['c(X) / µg L-1'] = df_sample.apply(lambda row: 
+            (row['Height (Hz)'] / height_is_sample) * (c_is_start / row['RRF']) 
+            if row['RRF'] else None, axis=1)
 
-    df_sample['RRF'] = df_sample['Name'].apply(get_rrf)
-else:
-    st.info("ℹ️ Стандардните податоци не се валидни или недостасуваат колони 'Name' и 'RRF'.")
-    df_sample['RRF'] = None
+        # Пресметка на маса во ng
+        df_sample['Маса (ng)'] = df_sample['c(X) / µg L-1'] * v_extract
 
-
-
-
-def process_sample(df_sample, df_std, c_is_start, v_extract, is_name):
-    # Пресметка на c(X)
-    df_sample['c(X) / µg L-1'] = df_sample.apply(lambda row: 
-        (row['Height (Hz)'] / height_is_sample) * (c_is_start / row['RRF']) 
-        if row['RRF'] else None, axis=1)  
-       
-    # Пресметка на маса во ng
-    df_sample['Маса (ng)'] = df_sample['c(X) / µg L-1'] * v_extract
-
-    return df_sample[['Ред. бр.', 'Name', 'RT (min)', 'Height (Hz)', 'RRF', 'c(X) / µg L-1', 'Маса (ng)']]
+        return df_sample[['Ред. бр.', 'Name', 'RT (min)', 'Height (Hz)', 'RRF', 'c(X) / µg L-1', 'Маса (ng)']]
 
 
 
