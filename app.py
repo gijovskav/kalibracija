@@ -689,3 +689,106 @@ st.dataframe(df_combined)
 
 
 
+#odzemame blenkovi
+# Копија за работа
+df_final = df_combined.copy()
+
+# Функција што ќе најде blank колони и ќе одзема од sample колони по метод
+def subtract_blank(df, method_label):
+    # Примери за blank колона: 'Blank (One Point)', 'Blank (Internal Curve)', 'Blank (External Curve)'
+    blank_col = None
+    for col in df.columns:
+        if col.lower().startswith('blank') and method_label.lower() in col.lower():
+            blank_col = col
+            break
+    if not blank_col:
+        return df  # Ако нема blank, врати како што е
+
+    # Одземи blank од сите колони за таа метода освен Name и blank самата
+    for col in df.columns:
+        if col != 'Name' and col != blank_col and col.endswith(f"({method_label})"):
+            df[col] = df[col] - df[blank_col]
+
+    return df
+
+# Список на методи според кои имаме колони во df_combined
+methods = ['One Point', 'Internal Curve', 'External Curve']
+
+# Применуваме одземање на blank по секој метод
+for method in methods:
+    df_final = subtract_blank(df_final, method)
+
+# Пополнување евентуални NaN со 0
+df_final = df_final.fillna(0)
+
+# Прикажи финална табела
+st.markdown("### Финална табела со одземен Blank по метод и sample:")
+st.dataframe(df_final)
+
+
+
+
+#redime 
+# Прво ги земаме сите колони освен 'Name'
+cols = [c for c in df_final.columns if c != 'Name']
+
+# Функција што извлекува sample бројка и метод од името на колоната
+import re
+def extract_sample_and_method(col_name):
+    # Пример колона: 'Sample 1 (One Point)'
+    sample_match = re.search(r'sample\s*(\d+)', col_name, re.I)
+    method_match = re.search(r'\(([^)]+)\)', col_name)
+    sample_num = int(sample_match.group(1)) if sample_match else 0
+    method = method_match.group(1) if method_match else ''
+    return (sample_num, method)
+
+# Сортирање по sample број, па по метод
+cols_sorted = sorted(cols, key=extract_sample_and_method)
+
+# Краен редослед на колони: Name + сортирани останати
+final_columns_order = ['Name'] + cols_sorted
+
+# Пренаредување на колоните
+df_final = df_final[final_columns_order]
+
+# Прикажи ја финалната табела со новиот редослед
+st.markdown("### Финална табела со одземен Blank и подредени колони по Sample и метод:")
+st.dataframe(df_final)
+
+
+
+
+import io
+import pandas as pd
+
+# Претпоставуваме дека ги имаш овие DataFrame-ови
+# summary, df_summary, df_summary_external, df_final (финална_kалибрација)
+
+# Функција за генерирање Excel фајл во меморија
+def to_excel_bytes():
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+        if isinstance(summary, pd.DataFrame):
+            summary.to_excel(writer, sheet_name='One_Point')
+        if isinstance(df_summary, pd.DataFrame):
+            df_summary.to_excel(writer, sheet_name='Internal_Curve')
+        if isinstance(df_summary_external, pd.DataFrame):
+            df_summary_external.to_excel(writer, sheet_name='External_Curve')
+        if isinstance(df_final, pd.DataFrame):
+            df_final.to_excel(writer, sheet_name='finalna_kalibracija')
+        writer.save()
+    processed_data = output.getvalue()
+    return processed_data
+
+# Копче за симнување
+excel_data = to_excel_bytes()
+
+st.download_button(
+    label="Симни ги сите табели Excel",
+    data=excel_data,
+    file_name='kalibracija_final.xlsx',
+    mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+)
+
+
+
