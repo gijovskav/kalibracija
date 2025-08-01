@@ -671,6 +671,17 @@ if isinstance(df_summary_internal, pd.DataFrame) and not df_summary_internal.emp
     df_internal = normalize_name_column(df_summary_internal)
     df_internal = df_internal.rename(columns=lambda c: f"{c} (Internal Curve)" if c != 'Name' else c)
     dfs_to_merge.append(df_internal)
+if 'df_summary_external' in locals():
+    st.write("df_summary_external постои.")
+    if isinstance(df_summary_external, pd.DataFrame):
+        st.write("df_summary_external е DataFrame.")
+        st.write("Колони во df_summary_external:", df_summary_external.columns.tolist())
+        st.write("Првите неколку редови:", df_summary_external.head())
+    else:
+        st.write("df_summary_external не е DataFrame.")
+else:
+    st.write("df_summary_external не постои во локалните променливи.")
+
 
 # Вметни го External Curve
 df_summary_external = locals().get('df_summary_external')
@@ -763,5 +774,6 @@ df_final = df_corrected[result_cols].copy()
 # --- Прикажи резултат ---
 st.markdown("### Финална компаративна табела со едноставно одземени blank вредности:")
 st.dataframe(df_final)
+
 
 
