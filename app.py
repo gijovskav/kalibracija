@@ -627,36 +627,3 @@ if method_internal_curve and result_df is not None and std_concentrations:
 
 
 
-#sumarna tabela
-all_samples = []
-
-# Бланк
-if blank_file is not None:
-    blank_df = pd.read_excel(blank_file)
-    df_blank_processed = process_sample(blank_df, df_std, c_is_start, v_extract, is_name)
-    if df_blank_processed is not None:
-        df_blank_processed["Sample ID"] = "Blank"
-        all_samples.append(df_blank_processed)
-
-# Сите семпли
-for idx, sample_file in enumerate(sample_files):
-    sample_df = pd.read_excel(sample_file)
-    df_sample_processed = process_sample(sample_df, df_std, c_is_start, v_extract, is_name)
-    if df_sample_processed is not None:
-        df_sample_processed["Sample ID"] = f"Sample {idx + 1}"
-        all_samples.append(df_sample_processed)
-
-# Спој ги сите
-if all_samples:
-    df_all = pd.concat(all_samples, ignore_index=True)
-
-    # Групирај и сумирај маси
-    summary = (
-        df_all.groupby(["Name", "Sample ID"])["Маса (ng)"]
-        .sum()
-        .unstack(fill_value=0)
-        .reset_index()
-    )
-
-    st.markdown("### Калибрација - сумарна табела (Blank + Samples):")
-    st.dataframe(summary)
