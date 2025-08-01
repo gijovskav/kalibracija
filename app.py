@@ -454,18 +454,18 @@ df_std_match = next(
 is_row = df_std_match[df_std_match[name_col] == is_name] if df_std_match is not None else pd.DataFrame()
 
 if not is_row.empty:
-        is_height = is_row[height_col_base].values[0]
+    is_height = is_row[height_col_base].values[0]
 
-        if pd.notna(is_height) and is_height != 0:
-            height_cols = [col for col in result_df.columns if col.startswith("Height_")]
-            for col in height_cols:
-                ratio_df[f"Ratio_{col.split('_')[-1]}"] = result_df[col] / is_height
-        else:
-            st.warning(f"⚠️ Висината за IS ({is_name}) не е валидна: {is_height}")
-            ratio_df = None
-        else:
-        st.warning(f"⚠️ IS '{is_name}' не е пронајден во првиот стандард.")
+    if pd.notna(is_height) and is_height != 0:
+        height_cols = [col for col in result_df.columns if col.startswith("Height_")]
+        for col in height_cols:
+            ratio_df[f"Ratio_{col.split('_')[-1]}"] = result_df[col] / is_height
+    else:
+        st.warning(f"⚠️ Висината за IS ({is_name}) не е валидна: {is_height}")
         ratio_df = None
+else:
+    st.warning(f"⚠️ IS '{is_name}' не е пронајден во стандардот со иста концентрација.")
+    ratio_df = None
 
     # Ако успешно се пресметани односите, продолжи со регресија
     if ratio_df is not None:
