@@ -636,11 +636,11 @@ all_names = set()
 if 'df_blank_processed' in locals() and df_blank_processed is not None:
     for name in df_blank_processed["Name"].unique():
         all_names.add(name)
-        summary_all_methods.setdefault(name, {})["Blank (Метод 1)"] = df_blank_processed[df_blank_processed["Name"] == name]["Total (ng)"].sum()
+        summary_all_methods.setdefault(name, {})["Blank (Метод 1)"] = df_blank_processed[df_blank_processed["Analyte"] == name]["Total (ng)"].sum()
     for i, df_sample in enumerate(sample_tables):
-        for name in df_sample["Name"].unique():
+        for name in df_sample["Analyte"].unique():
             all_names.add(name)
-            summary_all_methods.setdefault(name, {})[f"Sample {i+1} (Метод 1)"] = df_sample[df_sample["Name"] == name]["Total (ng)"].sum()
+            summary_all_methods.setdefault(name, {})[f"Sample {i+1} (Метод 1)"] = df_sample[df_sample["Analyte"] == name]["Total (ng)"].sum()
 
 # 2. Метод: Класична калибрација
 if 'blank_final' in locals() and blank_final is not None:
