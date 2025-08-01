@@ -180,7 +180,7 @@ else:
         if row['RRF'] else None, axis=1)
 
         # Пресметка на маса во ng
-        df_sample['Маса (ng)'] = df_sample['c(X) / µg L-1'] * v_extract
+    df_sample['Маса (ng)'] = df_sample['c(X) / µg L-1'] * v_extract
 
         return df_sample[['Ред. бр.', 'Name', 'RT (min)', 'Height (Hz)', 'RRF', 'c(X) / µg L-1', 'Маса (ng)']]
 
