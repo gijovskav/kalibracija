@@ -179,7 +179,7 @@ if method_one_point:
 
         return df_sample[['Ред. бр.', 'Name', 'RT (min)', 'Height (Hz)', 'RRF', 'c(X) / µg L-1', 'Маса (ng)']]
 
-    # --- Пример за blank обработка ---
+       # --- Пример за blank обработка ---
     if blank_file is not None:
         blank_df = pd.read_excel(blank_file)
         df_blank_processed = process_sample(blank_df, df_std, c_is_start, v_extract, is_name)
@@ -187,60 +187,53 @@ if method_one_point:
             st.markdown("### Калибрација со една точка - Blank:")
             st.dataframe(df_blank_processed)
 
-    # Пресметка за blank
-    blank_final = None
-    if df_blank_processed is not None and not df_calibration.empty:
-        blank_final = calculate_concentration_and_mass(df_blank_processed, df_calibration, v_extract)
-        st.markdown("### Надворешна калибрациона - Blank:")
-        st.dataframe(blank_final)
+    # --- Пример за samples обработка ---
+    sample_tables = []
+    for idx, sample_file in enumerate(sample_files):
+        sample_df = pd.read_excel(sample_file)
+        df_sample_processed = process_sample(sample_df, df_std, c_is_start, v_extract, is_name)
+        if df_sample_processed is not None:
+            st.markdown(f"### Калибрација со една точка - Sample {idx + 1}:")
+            st.dataframe(df_sample_processed)
+            sample_tables.append(df_sample_processed)
 
-    # Пресметка за samples
-    samples_final = []
-    if sample_tables and not df_calibration.empty:
-        for df_sample in sample_tables:
-            sample_calc = calculate_concentration_and_mass(df_sample, df_calibration, v_extract)
-            samples_final.append(sample_calc)
-            st.markdown(f"### Надворешна калибрациона - Sample {len(samples_final)} :")
-            st.dataframe(sample_calc)
+    # --- Сумарна табела со сите соединенија и маси во blank и samples ---
+    if df_blank_processed is not None and sample_tables:
+        summary = df_blank_processed[['Name', 'Маса (ng)']].rename(columns={'Маса (ng)': 'Маса (ng) Blank'})
+        for i, df_sample_proc in enumerate(sample_tables):
+            summary = summary.merge(df_sample_proc[['Name', 'Маса (ng)']].rename(columns={'Маса (ng)': f'Маса (ng) Sample {i + 1}'}),
+                                    on='Name', how='outer')
+        summary = summary.fillna(0)
 
-    # Сумирана табела
-    if blank_final is not None and samples_final:
-        all_names = set(blank_final["Name"].unique())
-        for df_s in samples_final:
-            all_names.update(df_s["Name"].unique())
+        st.markdown("### Калибрација со една точка - сумарна табела:")
+        st.dataframe(summary)
 
-        summary_data = []
-        for name in all_names:
-            row = {"Name": name}
-            blank_mass = blank_final[blank_final["Name"] == name]["m(X) / ng"].sum()
-            row["Blank"] = blank_mass
-            for i, df_s in enumerate(samples_final):
-                sample_mass = df_s[df_s["Name"] == name]["m(X) / ng"].sum()
-                row[f"Sample {i + 1}"] = sample_mass
-            summary_data.append(row)
-
-        df_summary = pd.DataFrame(summary_data)
-
-        st.markdown("### Надворешна калибрациона - сумирано:")
-        st.dataframe(df_summary)
-
-        # Генерирање Excel со сите резултати
+    if std_file_one_point is not None and df_std is not None:
         output = io.BytesIO()
-        with pd.ExcelWriter(output, engine="openpyxl") as writer:
-            blank_final.to_excel(writer, sheet_name="Blank", index=False)
-            for i, df_s in enumerate(samples_final):
-                df_s.to_excel(writer, sheet_name=f"Sample {i + 1}", index=False)
-            df_summary.to_excel(writer, sheet_name="Сумирано", index=False)
-        output.seek(0)
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+            # Табела со стандардниот документ
+            df_std.to_excel(writer, sheet_name="RRFs", index=False)
+
+            # Blank табела
+            if df_blank_processed is not None:
+                df_blank_processed.to_excel(writer, sheet_name="Blank", index=False)
+
+            # Samples табели
+            for i, df_sample_proc in enumerate(sample_tables):
+                df_sample_proc.to_excel(writer, sheet_name=f"Sample {i + 1}", index=False)
+
+            # Сумирана табела
+            if df_blank_processed is not None and sample_tables:
+                summary.to_excel(writer, sheet_name="Сумирано", index=False)
 
         st.download_button(
-            label="⬇️ Симни ги резултатите во ексел - надворешна калибрациона",
-            data=output,
-            file_name="nadvoresna_kalibraciona.xlsx",
+            label="⬇️ Преземи ги резултатите во Excel - Калибрација со една точка",
+            data=output.getvalue(),
+            file_name="kalibracija_edna_tocka.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
-    else:
-        st.warning("Не може да се генерира сумарна табела поради недостасувачки резултати за blank или samples.")
+
+
 
 
 #ako e vnesena serija standardi
@@ -286,6 +279,8 @@ if std_dataframes:
         st.dataframe(result_df)
     else:
             st.warning("⛔ Првиот стандард мора да ги содржи колоните: Name или name, Height (Hz), height, или Height и RT или RT(min)")
+
+
 
 
 
