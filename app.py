@@ -628,54 +628,59 @@ if method_internal_curve and result_df is not None and std_concentrations:
 
 
 
+import pandas as pd
+from io import BytesIO
+
 # --- КОМПАРАТИВНА СУМАРНА ТАБЕЛА ЗА СИТЕ МЕТОДИ ---
 summary_all_methods = {}
 all_names = set()
 
-# 1. Метод: Една точка (одделни табели: df_blank_processed и sample_tables)
+# Метод 1: df_blank_processed и sample_tables (секоја sample одделно)
 if 'df_blank_processed' in locals() and df_blank_processed is not None:
     for name in df_blank_processed["Name"].unique():
         all_names.add(name)
-        blank_mass = df_blank_processed[df_blank_processed["Name"] == name]["Маса (ng)"].sum()
-        summary_all_methods.setdefault(name, {})["Blank (Метод 1)"] = blank_mass
-    if 'sample_tables' in locals():
+        blank_sum = df_blank_processed[df_blank_processed["Name"] == name]["Маса (ng)"].sum()
+        summary_all_methods.setdefault(name, {})["Blank (Метод 1)"] = blank_sum
+
+    if 'sample_tables' in locals() and sample_tables:
         for i, df_sample in enumerate(sample_tables):
             for name in df_sample["Name"].unique():
                 all_names.add(name)
-                sample_mass = df_sample[df_sample["Name"] == name]["Маса (ng)"].sum()
-                summary_all_methods.setdefault(name, {})[f"Sample {i+1} (Метод 1)"] = sample_mass
+                sample_sum = df_sample[df_sample["Name"] == name]["Маса (ng)"].sum()
+                summary_all_methods.setdefault(name, {})[f"Sample {i+1} (Метод 1)"] = sample_sum
 
-# 2. Метод: Класична калибрација (одделни табели: blank_final и samples_final)
+# Метод 2: blank_final и samples_final (секоја sample одделно)
 if 'blank_final' in locals() and blank_final is not None:
     for name in blank_final["Name"].unique():
         all_names.add(name)
-        blank_mass = blank_final[blank_final["Name"] == name]["Маса (ng)"].sum()
-        summary_all_methods.setdefault(name, {})["Blank (Метод 2)"] = blank_mass
-    if 'samples_final' in locals():
+        blank_sum = blank_final[blank_final["Name"] == name]["Маса (ng)"].sum()
+        summary_all_methods.setdefault(name, {})["Blank (Метод 2)"] = blank_sum
+
+    if 'samples_final' in locals() and samples_final:
         for i, df_sample in enumerate(samples_final):
             for name in df_sample["Name"].unique():
                 all_names.add(name)
-                sample_mass = df_sample[df_sample["Name"] == name]["Маса (ng)"].sum()
-                summary_all_methods.setdefault(name, {})[f"Sample {i+1} (Метод 2)"] = sample_mass
+                sample_sum = df_sample[df_sample["Name"] == name]["Маса (ng)"].sum()
+                summary_all_methods.setdefault(name, {})[f"Sample {i+1} (Метод 2)"] = sample_sum
 
-# 3. Метод: Внатрешна калибрација (една табела за Blank и Samples: df_blank_results и df_samples_results)
-if ('df_blank_results' in locals() and df_blank_results is not None and not df_blank_results.empty and
-    'df_samples_results' in locals() and df_samples_results is not None and not df_samples_results.empty):
+# Метод 3: Внатрешна калибрација - df_blank_results и df_samples_results (се во една табела со Sample ID)
+if 'df_blank_results' in locals() and df_blank_results is not None and not df_blank_results.empty and \
+   'df_samples_results' in locals() and df_samples_results is not None and not df_samples_results.empty:
 
-    # Blank
+    # Blank (Метод 3)
     for name in df_blank_results["Name"].unique():
         all_names.add(name)
-        blank_mass = df_blank_results[df_blank_results["Name"] == name]["Маса (ng)"].sum()
-        summary_all_methods.setdefault(name, {})["Blank (Метод 3)"] = blank_mass
+        blank_sum = df_blank_results[df_blank_results["Name"] == name]["Маса (ng)"].sum()
+        summary_all_methods.setdefault(name, {})["Blank (Метод 3)"] = blank_sum
 
-    # Samples групирани по Sample ID
+    # Samples (Метод 3)
     sample_ids = df_samples_results["Sample ID"].unique()
     for sid in sample_ids:
         df_sid = df_samples_results[df_samples_results["Sample ID"] == sid]
         for name in df_sid["Name"].unique():
             all_names.add(name)
-            sample_mass = df_sid[df_sid["Name"] == name]["Маса (ng)"].sum()
-            summary_all_methods.setdefault(name, {})[f"{sid} (Метод 3)"] = sample_mass
+            sample_sum = df_sid[df_sid["Name"] == name]["Маса (ng)"].sum()
+            summary_all_methods.setdefault(name, {})[f"{sid} (Метод 3)"] = sample_sum
 
 # --- Формирање финална табела ---
 final_summary_rows = []
@@ -684,8 +689,7 @@ for name in sorted(all_names):
     row.update(summary_all_methods.get(name, {}))
     final_summary_rows.append(row)
 
-df_comparative_summary = pd.DataFrame(final_summary_rows)
-df_comparative_summary = df_comparative_summary.fillna(0)
+df_comparative_summary = pd.DataFrame(final_summary_rows).fillna(0)
 
 # --- Прикажи во Streamlit ---
 st.markdown("## 📊 Компаративна табела од сите методи")
@@ -695,25 +699,19 @@ st.dataframe(df_comparative_summary)
 excel_bytes = BytesIO()
 with pd.ExcelWriter(excel_bytes, engine="xlsxwriter") as writer:
     df_comparative_summary.to_excel(writer, index=False, sheet_name="Сумирана компарација")
-st.download_button(
-    "⬇️ Преземи компаративна табела (Excel)",
-    data=excel_bytes.getvalue(),
-    file_name="komparacija_metodi.xlsx"
-)
+st.download_button("⬇️ Преземи компаративна табела (Excel)", data=excel_bytes.getvalue(), file_name="komparacija_metodi.xlsx")
 
 # --- СУМАРНА ТАБЕЛА СО ОДЗЕМЕН BLANK ---
 summary_corrected = df_comparative_summary.copy()
 
 for index, row in summary_corrected.iterrows():
     for col in summary_corrected.columns:
-        if col.startswith("Sample") or col.startswith("Sample_") or ("Метод" in col and "Sample" in col):
-            # Одреди кој Blank да го одземеш
-            # Пример: "Sample 1 (Метод 1)" -> blank_col = "Blank (Метод 1)"
-            method_part = col.split("(")[-1].strip(")") if "(" in col else ""
-            blank_col = f"Blank ({method_part})" if method_part else None
-            if blank_col and blank_col in summary_corrected.columns:
+        if col.startswith("Sample"):
+            method_id = col.split("(")[-1].strip(")")
+            blank_col = f"Blank ({method_id})"
+            if blank_col in summary_corrected.columns:
                 corrected_value = row[col] - row[blank_col]
-                summary_corrected.at[index, col] = max(corrected_value, 0)
+                summary_corrected.at[index, col] = max(corrected_value, 0)  # избегни негативни
 
 st.markdown("## 📉 Сумарна табела со одземен Blank")
 st.dataframe(summary_corrected)
@@ -721,8 +719,4 @@ st.dataframe(summary_corrected)
 excel_corrected = BytesIO()
 with pd.ExcelWriter(excel_corrected, engine="xlsxwriter") as writer:
     summary_corrected.to_excel(writer, index=False, sheet_name="Одземен Blank")
-st.download_button(
-    "⬇️ Преземи табела со одземен Blank (Excel)",
-    data=excel_corrected.getvalue(),
-    file_name="komparacija_minus_blank.xlsx"
-)
+st.download_button("⬇️ Преземи табела со одземен Blank (Excel)", data=excel_corrected.getvalue(), file_name="komparacija_minus_blank.xlsx")
