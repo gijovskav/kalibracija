@@ -58,7 +58,7 @@ if method_internal_curve or method_external_curve or (method_one_point and (meth
 
 
     # Барање број на стандарди само еднаш
-    num_standards = st.number_input("Колку стандарди ќе користите?", min_value=1, max_value=20, value=5, step=1)
+    num_standards = st.number_input("Колку стандарди ќе користите? Ако користите метода на калибрациона права со внатрешен стандард прв ставете го референтниот стандард", min_value=1, max_value=20, value=5, step=1)
 
     uploaded_std_files = []
     std_concentrations = []
@@ -159,7 +159,7 @@ if method_one_point:
         # Генерира реден број
         df_sample.insert(0, "Ред. бр.", range(1, len(df_sample) + 1))
 
-# Наоѓање RRF од стандарди според Name
+        # Наоѓање RRF од стандарди според Name
         def get_rrf(name):
             match = df_std[df_std['Name'] == name]
             if not match.empty:
@@ -179,6 +179,103 @@ if method_one_point:
 
         return df_sample[['Ред. бр.', 'Name', 'RT (min)', 'Height (Hz)', 'RRF', 'c(X) / µg L-1', 'Маса (ng)']]
 
+    # --- Пример за blank обработка ---
+    if blank_file is not None:
+        blank_df = pd.read_excel(blank_file)
+        df_blank_processed = process_sample(blank_df, df_std, c_is_start, v_extract, is_name)
+        if df_blank_processed is not None:
+            st.markdown("### Калибрација со една точка - Blank:")
+            st.dataframe(df_blank_processed)
+
+    # --- Пример за samples обработка ---
+    sample_tables = []
+    for idx, sample_file in enumerate(sample_files):
+        sample_df = pd.read_excel(sample_file)
+        df_sample_processed = process_sample(sample_df, df_std, c_is_start, v_extract, is_name)
+        if df_sample_processed is not None:
+            st.markdown(f"### Калибрација со една точка - Sample {idx + 1}:")
+            st.dataframe(df_sample_processed)
+            sample_tables.append(df_sample_processed)
+
+    # --- Сумарна табела со сите соединенија и маси во blank и samples ---
+    if df_blank_processed is not None and sample_tables:
+        summary = df_blank_processed[['Name', 'Маса (ng)']].rename(columns={'Маса (ng)': 'Маса (ng) Blank'})
+        for i, df_sample_proc in enumerate(sample_tables):
+            summary = summary.merge(df_sample_proc[['Name', 'Маса (ng)']].rename(columns={'Маса (ng)': f'Маса (ng) Sample {i + 1}'}),
+                                    on='Name', how='outer')
+        summary = summary.fillna(0)
+
+        st.markdown("### Калибрација со една точка - сумарна табела:")
+        st.dataframe(summary)
+
+    if std_file_one_point is not None and df_std is not None:
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+            # Табела со стандардниот документ
+            df_std.to_excel(writer, sheet_name="RRFs", index=False)
+
+            # Blank табела
+            if df_blank_processed is not None:
+                df_blank_processed.to_excel(writer, sheet_name="Blank", index=False)
+
+            # Samples табели
+            for i, df_sample_proc in enumerate(sample_tables):
+                df_sample_proc.to_excel(writer, sheet_name=f"Sample {i + 1}", index=False)
+
+            # Сумирана табела
+            if df_blank_processed is not None and sample_tables:
+                summary.to_excel(writer, sheet_name="Сумирано", index=False)
+
+        st.download_button(
+            label="⬇️ Преземи ги резултатите во Excel - Калибрација со една точка",
+            data=output.getvalue(),
+            file_name="kalibracija_edna_tocka.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+
+#ako e vnesena serija standardi
+if method_internal_curve or method_external_curve:
+    for file in uploaded_std_files:
+        if file is not None:
+            df = pd.read_excel(file)
+            std_dataframes.append(df)
+def get_column_name(possible_names, columns):
+    for name in possible_names:
+        if name in columns:
+            return name
+    return None
+
+if std_dataframes:
+    df_reference = std_dataframes[0].copy()
+    cols = df_reference.columns
+
+    name_col = get_column_name(["Name", "name"], cols)
+    rt_col = get_column_name(["RT (min)", "RT", "rt"], cols)
+    height_col_base = get_column_name(["Height (Hz)", "Height", "height"], cols)
+
+    if name_col and rt_col and height_col_base:
+        result_df = df_reference[[name_col, rt_col]].copy()
+        result_df.rename(columns={name_col: "Name", rt_col: "RT"}, inplace=True)
+
+        for i, df_std in enumerate(std_dataframes):
+            height_col = get_column_name(["Height (Hz)", "Height", "height"], df_std.columns)
+            name_col_std = get_column_name(["Name", "name"], df_std.columns)
+
+            if height_col and name_col_std:
+                df_merge = df_std[[name_col_std, height_col]].copy()
+                df_merge.rename(columns={
+                    name_col_std: "Name",
+                    height_col: f"Height_{i + 1}"
+                }, inplace=True)
+
+                result_df = result_df.merge(df_merge, on="Name", how="left")
+            else:
+                st.warning(f"⚠️ Стандард {i + 1} нема 'Name' и/или 'Height' колони.")
+
+        st.write("### Собрани висини од сите стандарди:")
+        st.dataframe(result_df)
+    else:
+            st.warning("⛔ Првиот стандард мора да ги содржи колоните: Name или name, Height (Hz), height, или Height и RT или RT(min)")
 
 
 
