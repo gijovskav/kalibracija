@@ -507,7 +507,7 @@ if method_internal_curve and result_df is not None and std_concentrations:
         blank_results = []
         samples_results = []
 
-        for sample_id in df_all_samples["Sample ID"].unique():
+        ffor sample_id in df_all_samples["Sample ID"].unique():
             df_current = df_all_samples[df_all_samples["Sample ID"] == sample_id]
             is_row = df_current[df_current[name_col] == is_name]
 
@@ -529,10 +529,6 @@ if method_internal_curve and result_df is not None and std_concentrations:
 
                 slope = float(reg_row["c(X)/c(IS)"].values[0])
                 intercept = float(reg_row["Intercept"].values[0])
-
-                conc = ((height_val / is_height_val) - intercept) / slope * c_is_extract
-                mass = conc * v_extract
-
 
                 conc = ((height_val / is_height_val) - intercept) / slope * c_is_extract
                 mass = conc * v_extract
@@ -773,6 +769,7 @@ st.download_button(
     file_name='rezultati.xlsx',
     mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 )
+
 
 
 
