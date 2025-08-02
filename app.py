@@ -699,6 +699,48 @@ st.dataframe(df_final)
 
 
 
+#finalna reoorganizirana
+import re
+
+# Земаме колони кои се одземаат (на пример: "Sample 1 - Blank (One Point)")
+blank_cols = [col for col in df_corrected.columns if ' - Blank (' in col]
+
+# Ќе направиме речник: key=sample_num, value=list на колони (со сите методи)
+sample_dict = {}
+
+for col in blank_cols:
+    # Извлечи бројка од sample колона
+    sample_match = re.search(r'Sample (\d+)', col)
+    method_match = re.search(r'\((.+)\)', col)  # методот во заграда
+    if sample_match and method_match:
+        sample_num = sample_match.group(1)
+        method = method_match.group(1)
+
+        if sample_num not in sample_dict:
+            sample_dict[sample_num] = []
+        sample_dict[sample_num].append((method, col))
+
+# Сега ќе направиме нова листа колони за редослед: за секој sample по методи сортирано (на пример алфабетски по метод)
+new_cols = ['Name']
+
+for sample_num in sorted(sample_dict.keys(), key=int):
+    # Сортираме по метод за поубава презентација (можеш и по некој хемиски ред ако сакаш)
+    methods_cols_sorted = sorted(sample_dict[sample_num], key=lambda x: x[0])
+    for method, col in methods_cols_sorted:
+        # За името на колоната правиме "Sample 1 - One Point"
+        new_col_name = col.replace(" - Blank (", " - ").replace(")", "")
+        df_corrected.rename(columns={col: new_col_name}, inplace=True)
+        new_cols.append(new_col_name)
+
+# Направи нова табела со редоследот
+df_reorganized = df_corrected[new_cols].copy()
+
+st.markdown("### Реорганизирана табела по samples со сите методи:")
+st.dataframe(df_reorganized)
+
+
+
+
 
 
 
