@@ -665,7 +665,7 @@ if isinstance(summary, pd.DataFrame) and not summary.empty:
 
 # Вметни го External Curve
 summary_data = locals().get('summary_data')
-if isinstance(df_summary, pd.DataFrame) and not summary_data.empty:
+if isinstance(summary_data, pd.DataFrame) and not summary_data.empty:
     df_external = normalize_name_column(summary_data)
     df_external = df_external.rename(columns=lambda c: f"{c} (External Curve)" if c != 'Name' else c)
     dfs_to_merge.append(df_external)
@@ -729,6 +729,7 @@ df_final = df_corrected[result_cols].copy()
 
 st.markdown("### Финална компаративна табела со едноставно одземени blank вредности:")
 st.dataframe(df_final)
+
 
 
 
