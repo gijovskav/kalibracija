@@ -597,7 +597,7 @@ else:
     st.warning("Нема доволно податоци за внатрешна калибрациона крива.")
                 
 
-
+print(df_c_over_cis.head()) 
 
 #krajna tabela
 
@@ -773,6 +773,7 @@ st.download_button(
     file_name='rezultati.xlsx',
     mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 )
+
 
 
 
