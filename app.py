@@ -572,7 +572,6 @@ if method_internal_curve and result_df is not None and std_concentrations:
         st.markdown("### Внатрешна калибрациона - сумирано")
         st.dataframe(df_summary_internal)  # <-- сменето име
 
-
         # Генерирање Excel
         output_internal = io.BytesIO()
         with pd.ExcelWriter(output_internal, engine="openpyxl") as writer:
@@ -593,7 +592,7 @@ else:
     st.warning("Нема доволно податоци за внатрешна калибрациона крива.")
                 
 
-print(df_c_over_cis.head()) 
+
 
 #krajna tabela
 
@@ -769,6 +768,7 @@ st.download_button(
     file_name='rezultati.xlsx',
     mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 )
+
 
 
 
