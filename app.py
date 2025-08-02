@@ -36,15 +36,17 @@ v_extract = st.number_input("Волумен на конечен екстракт
 sample_mapping = {}
 
 if sample_files:
-    st.markdown("### 🗂️ Идентификација на прикачени samples")
+    st.markdown("### 🗂️ Sample датотеки и доделени имиња")
+    
+    mapping_data = []
     for idx, file in enumerate(sample_files):
-        default_sample_id = f"Sample {idx+1}"
+        sample_id = f"Sample {idx+1}"
         filename = file.name
-
-        # Поле за преименување
-        new_sample_id = st.text_input(f"{default_sample_id} (датотека: {filename})", value=default_sample_id)
-
-        sample_mapping[filename] = new_sample_id
+        sample_mapping[filename] = sample_id
+        mapping_data.append({"Sample ID": sample_id, "Име на датотека": filename})
+    
+    df_mapping = pd.DataFrame(mapping_data)
+    st.dataframe(df_mapping)
 
 
 # --- ако е потребен IS ---
@@ -783,6 +785,7 @@ st.download_button(
     file_name='rezultati.xlsx',
     mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 )
+
 
 
 
