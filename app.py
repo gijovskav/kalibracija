@@ -653,7 +653,7 @@ for df_method in dfs_to_merge:
 df_combined = df_combined.fillna(0)
 
 # --- Прикажи ја комбинованата табела со сите методи ---
-st.markdown("### Комбинирана сумирана табела за сите методи и samples:")
+st.markdown("### Финална табела со резултати:")
 st.dataframe(df_combined)
 
 
@@ -694,7 +694,7 @@ for method in methods:
 result_cols = ['Name'] + [col for col in df_corrected.columns if ' - Blank (' in col]
 df_final = df_corrected[result_cols].copy()
 
-st.markdown("### Финална компаративна табела со одземени blank вредности за сите методи:")
+st.markdown("### Компаративна табела со одземени слепи проби:")
 st.dataframe(df_final)
 
 
@@ -735,10 +735,38 @@ for sample_num in sorted(sample_dict.keys(), key=int):
 # Направи нова табела со редоследот
 df_reorganized = df_corrected[new_cols].copy()
 
-st.markdown("### Реорганизирана табела по samples со сите методи:")
+st.markdown("### Споредба на Samples по метода:")
 st.dataframe(df_reorganized)
 
 
+#ексел за трите табели
+# Функција за експортирање на повеќе DataFrame во еден Excel фајл со повеќе sheet-ови
+def to_excel(dfs: dict):
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+        for sheet_name, df in dfs.items():
+            df.to_excel(writer, index=False, sheet_name=sheet_name)
+        writer.save()
+    processed_data = output.getvalue()
+    return processed_data
+
+# Словар со сите DataFrame-ови што сакаш да ги експортираш
+dfs_to_export = {
+    'Финална табела': df_combined,
+    'Компаративна (одземени blank)': df_final,
+    'Реорганизирана по samples': df_reorganized
+}
+
+# Креирање на Excel фајл во меморија
+excel_data = to_excel(dfs_to_export)
+
+# Копче за симнување
+st.download_button(
+    label="Симни ги сумарните табели како Ексел",
+    data=excel_data,
+    file_name='rezultati.xlsx',
+    mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+)
 
 
 
