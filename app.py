@@ -771,6 +771,35 @@ st.download_button(
 
 
 
+#prekrstuvanje na iminja
+sample_tables = []
+renamed_sample_names = []  # ќе чуваме новите имиња
+
+for idx, sample_file in enumerate(sample_files):
+    # Вчитај го фајлот
+    sample_df = pd.read_excel(sample_file)
+    df_sample_processed = process_sample(sample_df, df_std, c_is_start, v_extract, is_name)
+
+    # Постави default име
+    original_name = sample_file.name
+    default_name = f"Sample {idx + 1} – Document: {original_name}"
+
+    # Поле за преименување
+    new_name = st.text_input(f"📝 Име за {default_name}", value=default_name, key=f"sample_rename_{idx}")
+
+    # Прикажи ги резултатите со новото име
+    if df_sample_processed is not None:
+        st.markdown(f"### Калибрација со една точка – {new_name}")
+        st.dataframe(df_sample_processed)
+        sample_tables.append(df_sample_processed)
+        renamed_sample_names.append(new_name)
+
+for i, df_res in enumerate(samples_results):
+    sheet_name = renamed_sample_names[i][:31]  # Excel ограничува имиња до 31 знак
+    df_res.to_excel(writer, sheet_name=sheet_name, index=False)
+
+
+
 
 
 
