@@ -423,75 +423,68 @@ else:
 
 
 # INTERNA KALIBRACIJA
+# Осигурај се дека result_df и std_concentrations се дефинирани
 if 'result_df' not in locals():
     result_df = None
 if 'std_concentrations' not in locals():
     std_concentrations = []
 
+# Внатрешна калибрација со крива - извршување само ако се вклучи оваа опција
 if method_internal_curve and result_df is not None and std_concentrations:
 
     # 1. Пресметај C(X)/C(IS) регресија базирана на H(X)/H(IS)
     std_conc_norm = np.array(std_concentrations) / std_concentrations[0]
     std_conc_norm = std_conc_norm.reshape(-1, 1)
 
+    # Подготви ratio_df = H(X)/H(IS) за секој стандард
     ratio_df = result_df[["Name"]].copy()
     height_cols = [col for col in result_df.columns if col.startswith("Height_")]
 
     for idx, col in enumerate(height_cols):
-        df_std = std_dataframes[idx]
+        df_std = std_dataframes[idx]  # земи го соодветниот стандард
         is_row = df_std[df_std[name_col] == is_name]
 
-        ratio_col_name = f"Ratio_{col.split('_')[-1]}"
         if not is_row.empty:
             is_height = is_row[height_col_base].values[0]
             if pd.notna(is_height) and is_height != 0:
-                ratio_df[ratio_col_name] = result_df[col] / is_height
+                ratio_df[f"Ratio_{col.split('_')[-1]}"] = result_df[col] / is_height
             else:
                 st.warning(f"⚠️ Висината за IS ({is_name}) во стандард {idx+1} не е валидна: {is_height}")
-                ratio_df[ratio_col_name] = np.nan
+                ratio_df[f"Ratio_{col.split('_')[-1]}"] = np.nan
         else:
             st.warning(f"⚠️ IS '{is_name}' не е пронајден во стандард {idx+1}.")
-            ratio_df[ratio_col_name] = np.nan
+            ratio_df[f"Ratio_{col.split('_')[-1]}"] = np.nan
 
     # Ако успешно се пресметани односите, продолжи со регресија
-    regression_results = []
+    if ratio_df is not None:
+        regression_results = []
 
-    for idx, row in ratio_df.iterrows():
-        name = row["Name"]
-        ratios = []
-        valid = True
-        for i in range(len(std_concentrations)):
-            val = row.get(f"Ratio_{i+1}", np.nan)
-            if pd.isna(val):
-                valid = False
-                break
-            ratios.append(val)
+        for idx, row in ratio_df.iterrows():
+            name = row["Name"]
+            ratios = [row.get(f"Ratio_{i+1}", np.nan) for i in range(len(std_concentrations))]
 
-        if not valid:
-            continue
+            if pd.isna(ratios).any():
+                continue
 
-        y_vals = np.array(ratios).reshape(-1, 1)
-        model = LinearRegression()
-        model.fit(std_conc_norm, y_vals)
+            y_vals = np.array(ratios).reshape(-1, 1)
+            model = LinearRegression()
+            model.fit(std_conc_norm, y_vals)
 
-        slope = float(model.coef_)
-        intercept = float(model.intercept_)
-        correl = float(np.corrcoef(std_conc_norm.flatten(), y_vals.flatten())[0, 1])
+            slope = float(model.coef_)
+            intercept = float(model.intercept_)
+            correl = float(np.corrcoef(std_conc_norm.flatten(), y_vals.flatten())[0, 1])
 
-        regression_results.append({
-            "Name": name,
-            "H(X)/H(IS)": "; ".join([f"{r:.3f}" for r in ratios]),
-            "c(X)/c(IS)": f"{slope:.6f}",
-            "Intercept": f"{intercept:.6f}",
-            "Correlation": f"{correl:.4f}"
-        })
+            regression_results.append({
+                "Name": name,
+                "H(X)/H(IS)": "; ".join([f"{r:.3f}" for r in ratios]),
+                "c(X)/c(IS)": f"{slope:.6f}",
+                "Intercept": f"{intercept:.6f}",
+                "Correlation": f"{correl:.4f}"
+            })
 
-    df_c_over_cis = pd.DataFrame(regression_results)
-
-    if df_c_over_cis.empty:
-        st.error("❌ Неуспешна регресија - нема податоци во df_c_over_cis.")
-    else:
+        df_c_over_cis = pd.DataFrame(regression_results)
         st.write("df_c_over_cis preview:", df_c_over_cis.head())
+
         st.markdown("### Внатрешна калибрациона права")
         st.dataframe(df_c_over_cis)
 
@@ -529,6 +522,7 @@ if method_internal_curve and result_df is not None and std_concentrations:
                 name = row[name_col]
                 height_val = row[height_col_base]
 
+                # Најди регресија
                 reg_row = df_c_over_cis[df_c_over_cis["Name"] == name]
                 if reg_row.empty or pd.isna(height_val) or pd.isna(is_height_val):
                     continue
@@ -536,18 +530,13 @@ if method_internal_curve and result_df is not None and std_concentrations:
                 slope = float(reg_row["c(X)/c(IS)"].values[0])
                 intercept = float(reg_row["Intercept"].values[0])
 
-                # КОНЕЧНА ХЕМИСКА ПРЕСМЕТКА:
-                ratio = height_val / is_height_val
-                c_over_cis = slope * ratio + intercept
-                c_x = c_over_cis * c_is_extract  # користиме реална концентрација на IS
-                mass = c_x * v_extract
+                conc = slope * (height_val / is_height_val) + intercept
+                mass = conc * v_extract
 
                 result_rows.append({
                     "Name": name,
                     "Height": height_val,
-                    "H(X)/H(IS)": ratio,
-                    "c(X)/c(IS)": c_over_cis,
-                    "c(X)": c_x,
+                    "c(X)/c(IS)": conc,
                     "Mass (ng)": mass
                 })
 
@@ -562,7 +551,7 @@ if method_internal_curve and result_df is not None and std_concentrations:
                 st.markdown(f"### Внатрешна калибрациона - {sample_id}")
                 st.dataframe(df_results_sample)
 
-        # Сумирана табела
+        # Сумирана табела за внатрешна калибрација
         all_names = set()
         for df_res in blank_results + samples_results:
             all_names.update(df_res["Name"].unique())
@@ -578,11 +567,10 @@ if method_internal_curve and result_df is not None and std_concentrations:
                 row[f"Sample {i+1}"] = mass_sum
             summary_rows.append(row)
 
-        df_summary_internal = pd.DataFrame(summary_rows)
+        df_summary_internal = pd.DataFrame(summary_rows)  # <-- сменето име
 
         st.markdown("### Внатрешна калибрациона - сумирано")
-        st.dataframe(df_summary_internal)
-
+        st.dataframe(df_summary_internal)  # <-- сменето име
 
 
         # Генерирање Excel
@@ -781,6 +769,7 @@ st.download_button(
     file_name='rezultati.xlsx',
     mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 )
+
 
 
 
