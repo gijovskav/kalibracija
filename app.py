@@ -59,7 +59,7 @@ if method_internal_curve or method_external_curve or (method_one_point and (meth
 
 
     # Барање број на стандарди само еднаш
-    num_standards = st.number_input("Колку стандарди ќе користите? Ако користите метода на калибрациона права со внатрешен стандард прв ставете го референтниот стандард", min_value=1, max_value=20, value=5, step=1)
+    num_standards = st.number_input("Колку стандарди ќе користите? ", min_value=1, max_value=20, value=5, step=1)
 
     uploaded_std_files = []
     std_concentrations = []
@@ -530,13 +530,15 @@ if method_internal_curve and result_df is not None and std_concentrations:
                 slope = float(reg_row["c(X)/c(IS)"].values[0])
                 intercept = float(reg_row["Intercept"].values[0])
 
-                conc = slope * (height_val / is_height_val) + intercept
+                ratio = height_val / is_height_val
+                c_over_cis = slope * ratio + intercept
+                conc = c_over_cis * c_is_extract  # <-- поправено!
                 mass = conc * v_extract
 
                 result_rows.append({
                     "Name": name,
                     "Height": height_val,
-                    "c(X)/c(IS)": conc,
+                    "c(X)/c(IS)": c_over_cis,
                     "Mass (ng)": mass
                 })
 
@@ -567,10 +569,11 @@ if method_internal_curve and result_df is not None and std_concentrations:
                 row[f"Sample {i+1}"] = mass_sum
             summary_rows.append(row)
 
-        df_summary_internal = pd.DataFrame(summary_rows)  # <-- сменето име
+        df_summary_internal = pd.DataFrame(summary_rows)
 
         st.markdown("### Внатрешна калибрациона - сумирано")
-        st.dataframe(df_summary_internal)  # <-- сменето име
+        st.dataframe(df_summary_internal)
+
 
         # Генерирање Excel
         output_internal = io.BytesIO()
@@ -768,6 +771,7 @@ st.download_button(
     file_name='rezultati.xlsx',
     mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 )
+
 
 
 
