@@ -530,7 +530,7 @@ if method_internal_curve and result_df is not None and std_concentrations:
                 slope = float(reg_row["c(X)/c(IS)"].values[0])
                 intercept = float(reg_row["Intercept"].values[0])
 
-                conc = slope * (height_val / is_height_val) + intercept
+                conc = ((height_val / is_height_val) - intercept) / slope * c_is_extract
                 mass = conc * v_extract
 
                 result_rows.append({
@@ -769,6 +769,7 @@ st.download_button(
     file_name='rezultati.xlsx',
     mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 )
+
 
 
 
