@@ -630,16 +630,16 @@ if isinstance(summary, pd.DataFrame) and not summary.empty:
     dfs_to_merge.append(df_1p)
 
 # Вметни го External Curve
-summary_data = locals().get('summary_data')
-if isinstance(summary_data, pd.DataFrame) and not summary_data.empty:
-    df_external = normalize_name_column(summary_data)
+df_summary_external = locals().get('df_summary_external')
+if isinstance(df_summary_external, pd.DataFrame) and not df_summary_external.empty:
+    df_external = normalize_name_column(df_summary_external)
     df_external = df_external.rename(columns=lambda c: f"{c} (External Curve)" if c != 'Name' else c)
     dfs_to_merge.append(df_external)
 
 # Вметни го Internal Curve
-df_summary = locals().get('df_summary')
-if isinstance(df_summary, pd.DataFrame) and not df_summary.empty:
-    df_internal = normalize_name_column(df_summary)
+df_summary_internal = locals().get('df_summary_internal')
+if isinstance(df_summary_internal, pd.DataFrame) and not df_summary_internal.empty:
+    df_internal = normalize_name_column(df_summary_internal)
     df_internal = df_internal.rename(columns=lambda c: f"{c} (Internal Curve)" if c != 'Name' else c)
     dfs_to_merge.append(df_internal)
 
@@ -695,6 +695,7 @@ df_final = df_corrected[result_cols].copy()
 
 st.markdown("### Финална компаративна табела со едноставно одземени blank вредности:")
 st.dataframe(df_final)
+
 
 
 
