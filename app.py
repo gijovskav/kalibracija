@@ -606,7 +606,7 @@ if method_internal_curve and result_df is not None and std_concentrations:
                 df_summary = pd.DataFrame(summary_rows)
 
                 st.markdown("### Внатрешна калибрациона - сумирано")
-                st.dataframe(sumarno)
+                st.dataframe(df_summary)
 
                 # Генерирај Excel
                 output_excel = io.BytesIO()
@@ -671,9 +671,9 @@ if isinstance(df_summary, pd.DataFrame) and not df_summary.empty:
     dfs_to_merge.append(df_external)
 
 # Вметни го Internal Curve
-sumarno = locals().get('sumarno')
-if isinstance(sumarno, pd.DataFrame) and not sumarno.empty:
-    df_internal = normalize_name_column(sumarno)
+df_summary = locals().get('df_summary')
+if isinstance(df_summary, pd.DataFrame) and not df_summary.empty:
+    df_internal = normalize_name_column(df_summary)
     df_internal = df_internal.rename(columns=lambda c: f"{c} (Internal Curve)" if c != 'Name' else c)
     dfs_to_merge.append(df_internal)
 
@@ -729,6 +729,7 @@ df_final = df_corrected[result_cols].copy()
 
 st.markdown("### Финална компаративна табела со едноставно одземени blank вредности:")
 st.dataframe(df_final)
+
 
 
 
