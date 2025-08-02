@@ -746,9 +746,10 @@ def to_excel(dfs: dict):
     with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
         for sheet_name, df in dfs.items():
             df.to_excel(writer, index=False, sheet_name=sheet_name)
-        writer.save()
+        # writer.save()  # Оваа линија се брише
     processed_data = output.getvalue()
     return processed_data
+
 
 # Словар со сите DataFrame-ови што сакаш да ги експортираш
 dfs_to_export = {
@@ -767,6 +768,7 @@ st.download_button(
     file_name='rezultati.xlsx',
     mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 )
+
 
 
 
