@@ -671,9 +671,9 @@ if isinstance(df_summary, pd.DataFrame) and not df_summary.empty:
     dfs_to_merge.append(df_external)
 
 # Вметни го Internal Curve
-summary_data = locals().get('summary_data')
-if isinstance(summary_data, pd.DataFrame) and not summary_data.empty:
-    df_internal = normalize_name_column(summary_data)
+summary_rows = locals().get('summary_rows')
+if isinstance(summary_rows, pd.DataFrame) and not summary_rows.empty:
+    df_internal = normalize_name_column(summary_rows)
     df_internal = df_internal.rename(columns=lambda c: f"{c} (Internal Curve)" if c != 'Name' else c)
     dfs_to_merge.append(df_internal)
 
@@ -729,6 +729,7 @@ df_final = df_corrected[result_cols].copy()
 
 st.markdown("### Финална компаративна табела со едноставно одземени blank вредности:")
 st.dataframe(df_final)
+
 
 
 
