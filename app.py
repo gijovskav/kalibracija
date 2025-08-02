@@ -667,34 +667,36 @@ df_corrected = df_combined.copy()
 methods = ['One Point', 'Internal Curve', 'External Curve']
 
 for method in methods:
-    # Наоѓање sample колони (пример: sample 1 (One Point))
-    sample_cols = [col for col in df_corrected.columns if re.match(rf".*sample\s*\d+\s*\({method}\)", col, flags=re.IGNORECASE)]
-    
-    # Наоѓање blank колона (пример: blank (One Point))
-    blank_col = next((col for col in df_corrected.columns if re.match(rf".*blank.*\({method}\)", col, flags=re.IGNORECASE)), None)
+    # Наоѓање sample колони што содржат методот во заграда (пример: "Sample 1 (One Point)")
+    sample_cols = [col for col in df_corrected.columns if re.search(rf"sample\s*\d+.*\({re.escape(method)}\)", col, flags=re.IGNORECASE)]
 
-    if not blank_col:
-        continue  # ако нема blank колона за овој метод, скокни
+    # Наоѓање blank колона со методот во заграда (пример: "Blank (One Point)")
+    blank_col = next((col for col in df_corrected.columns if re.search(rf"blank.*\({re.escape(method)}\)", col, flags=re.IGNORECASE)), None)
+
+    if not blank_col or not sample_cols:
+        # Ако нема blank колона или нема sample колони за овој метод, прескокни
+        continue
 
     for sample_col in sample_cols:
-        # Извлечи бројката на sample
+        # Извлекување на бројот од sample колоната, на пример "Sample 1"
         match = re.search(r'sample\s*(\d+)', sample_col, flags=re.IGNORECASE)
         if not match:
             continue
         sample_num = match.group(1)
 
-        # Име на новата колона
+        # Име на новата колона со резултат после одземање
         new_col = f"Sample {sample_num} - Blank ({method})"
 
-        # Пресметај разлика
+        # Одземање на blank од sample колона
         df_corrected[new_col] = df_corrected[sample_col] - df_corrected[blank_col]
 
-# Избери само новите колони + 'Name'
+# Избери само 'Name' и новите колони со одземени вредности
 result_cols = ['Name'] + [col for col in df_corrected.columns if ' - Blank (' in col]
 df_final = df_corrected[result_cols].copy()
 
-st.markdown("### Финална компаративна табела со едноставно одземени blank вредности:")
+st.markdown("### Финална компаративна табела со одземени blank вредности за сите методи:")
 st.dataframe(df_final)
+
 
 
 
