@@ -41,6 +41,11 @@ if sample_files:
         default_sample_id = f"Sample {idx+1}"
         filename = file.name
 
+        # Поле за преименување
+        new_sample_id = st.text_input(f"{default_sample_id} (датотека: {filename})", value=default_sample_id)
+
+        sample_mapping[filename] = new_sample_id
+
 
 # --- ако е потребен IS ---
 if method_one_point or method_internal_curve:
@@ -778,6 +783,7 @@ st.download_button(
     file_name='rezultati.xlsx',
     mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 )
+
 
 
 
