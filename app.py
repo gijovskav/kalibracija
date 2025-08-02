@@ -663,9 +663,6 @@ if isinstance(summary, pd.DataFrame) and not summary.empty:
     df_1p = df_1p.rename(columns=lambda c: f"{c} (One Point)" if c != 'Name' else c)
     dfs_to_merge.append(df_1p)
 
-print("Колони во summary_data:")
-print(summary_data.columns.tolist())
-
 # Вметни го External Curve
 summary_data = locals().get('summary_data')
 if isinstance(summary_data, pd.DataFrame) and not summary_data.empty:
@@ -732,6 +729,7 @@ df_final = df_corrected[result_cols].copy()
 
 st.markdown("### Финална компаративна табела со едноставно одземени blank вредности:")
 st.dataframe(df_final)
+
 
 
 
