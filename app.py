@@ -514,7 +514,7 @@ if method_internal_curve and result_df is not None and std_concentrations:
         if sample_files:
             for idx, f in enumerate(sample_files):
                 df_sample = pd.read_excel(f)
-                df_sample["Sample ID"] = f"Sample_{idx+1}"
+                filename = f.name sample_id = sample_mapping.get(filename, f"Sample_{idx+1}") df_sample["Sample ID"] = sample_id
                 all_samples.append(df_sample)
 
         df_all_samples = pd.concat(all_samples, ignore_index=True)
@@ -783,6 +783,7 @@ st.download_button(
     file_name='rezultati.xlsx',
     mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 )
+
 
 
 
