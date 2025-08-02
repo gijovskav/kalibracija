@@ -778,7 +778,6 @@ renamed_sample_names = []  # ќе чуваме новите имиња
 for idx, sample_file in enumerate(sample_files):
     # Вчитај го фајлот
     sample_df = pd.read_excel(sample_file)
-    df_sample_processed = process_sample(sample_df, df_std, c_is_start, v_extract, is_name)
 
     # Постави default име
     original_name = sample_file.name
@@ -797,6 +796,7 @@ for idx, sample_file in enumerate(sample_files):
 for i, df_res in enumerate(samples_results):
     sheet_name = renamed_sample_names[i][:31]  # Excel ограничува имиња до 31 знак
     df_res.to_excel(writer, sheet_name=sheet_name, index=False)
+
 
 
 
