@@ -533,6 +533,10 @@ if method_internal_curve and result_df is not None and std_concentrations:
                 conc = ((height_val / is_height_val) - intercept) / slope * c_is_extract
                 mass = conc * v_extract
 
+
+                conc = ((height_val / is_height_val) - intercept) / slope * c_is_extract
+                mass = conc * v_extract
+
                 result_rows.append({
                     "Name": name,
                     "Height": height_val,
@@ -769,6 +773,7 @@ st.download_button(
     file_name='rezultati.xlsx',
     mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 )
+
 
 
 
