@@ -281,7 +281,7 @@ if std_dataframes:
     else:
             st.warning("⛔ Првиот стандард мора да ги содржи колоните: Name или name, Height (Hz), height, или Height и RT или RT(min)")
 
-#EKSTERNA KALIBRACIJA
+# EKSTERNA KALIBRACIJA
 if method_external_curve and 'result_df' in locals() and result_df is not None and std_concentrations:
     calibration_data = []
 
@@ -296,140 +296,133 @@ if method_external_curve and 'result_df' in locals() and result_df is not None a
         for f in sample_files:
             sample_tables.append(pd.read_excel(f))
 
+    # Филтрирање на колоните што се само Height_X
+    height_columns = [col for col in result_df.columns if col.startswith("Height_")]
 
+    for index, row in result_df.iterrows():
+        name = row["Name"]
+        heights = row[height_columns].values
 
+        # Комбинирај ги само валидните парови
+        valid_pairs = [(x, y) for x, y in zip(std_concentrations, heights) if pd.notna(y)]
 
+        if len(valid_pairs) < 2:
+            continue
 
+        x_vals, y_vals = zip(*valid_pairs)
+        X = np.array(x_vals).reshape(-1, 1)
+        y = np.array(y_vals).reshape(-1, 1)
 
-        # Филтрирање на колоните што се само Height_X
-        height_columns = [col for col in result_df.columns if col.startswith("Height_")]
+        model = LinearRegression()
+        model.fit(X, y)
 
-        for index, row in result_df.iterrows():
-            name = row["Name"]
-            heights = row[height_columns].values
+        slope = float(model.coef_)
+        intercept = float(model.intercept_)
+        r2 = float(model.score(X, y))
 
-            # Комбинирај ги само валидните парови
-            valid_pairs = [(x, y) for x, y in zip(std_concentrations, heights) if pd.notna(y)]
+        calibration_data.append({
+            "Name": name,
+            "Slope": slope,
+            "Intercept": intercept,
+            "Correlation (R²)": r2
+        })
 
-            if len(valid_pairs) < 2:
-                continue
+    df_calibration = pd.DataFrame(calibration_data)
 
-            x_vals, y_vals = zip(*valid_pairs)
-            X = np.array(x_vals).reshape(-1, 1)
-            y = np.array(y_vals).reshape(-1, 1)
-
-            model = LinearRegression()
-            model.fit(X, y)
-
-            slope = float(model.coef_)
-            intercept = float(model.intercept_)
-            r2 = float(model.score(X, y))
-
-            calibration_data.append({
-                "Name": name,
-                "Slope": slope,
-                "Intercept": intercept,
-                "Correlation (R²)": r2
-            })
-
-        df_calibration = pd.DataFrame(calibration_data)
-
-        if not df_calibration.empty:
-            st.write("### Калибрациона права за надворешна калибрација:")
-            st.dataframe(df_calibration)
-        else:
-            st.warning("⚠️ Нема доволно податоци за да се изврши калибрација.")
-
+    if not df_calibration.empty:
+        st.write("### Калибрациона права за надворешна калибрација:")
+        st.dataframe(df_calibration)
     else:
-        st.warning("Нема податоци за резултат или стандардни концентрации за калкулација.")
+        st.warning("⚠️ Нема доволно податоци за да се изврши калибрација.")
+
+else:
+    st.warning("Нема податоци за резултат или стандардни концентрации за калкулација.")
 
 
+def calculate_concentration_and_mass(df, df_calib, v_extract):
+    df_result = df.copy()
+    df_result["c(X) / µg/L"] = None
+    df_result["Маса (ng)"] = None
 
-    def calculate_concentration_and_mass(df, df_calib, v_extract):
-        df_result = df.copy()
-        df_result["c(X) / µg/L"] = None
-        df_result["Маса (ng)"] = None
+    for idx, row in df_result.iterrows():
+        name = row.get("Name")
+        height = row.get("Height") or row.get("Height (Hz)") or row.get("height")
 
-        for idx, row in df_result.iterrows():
-            name = row.get("Name")
-            height = row.get("Height") or row.get("Height (Hz)") or row.get("height")
+        if pd.isna(height):
+            continue
 
-            if pd.isna(height):
-                continue
+        calib_row = df_calib[df_calib["Name"] == name]
+        if not calib_row.empty:
+            slope = calib_row["Slope"].values[0]
+            intercept = calib_row["Intercept"].values[0]
 
-            calib_row = df_calib[df_calib["Name"] == name]
-            if not calib_row.empty:
-                slope = calib_row["Slope"].values[0]
-                intercept = calib_row["Intercept"].values[0]
+            if slope != 0:
+                conc = (height - intercept) / slope
+                mass = conc * v_extract
 
-                if slope != 0:
-                    conc = (height - intercept) / slope
-                    mass = conc * v_extract
+                df_result.at[idx, "c(X) / µg/L"] = conc
+                df_result.at[idx, "Маса (ng)"] = mass
 
-                    df_result.at[idx, "c(X) / µg/L"] = conc
-                    df_result.at[idx, "Маса (ng)"] = mass
-
-        return df_result
-
-
-    # Пресметка за blank
-    blank_final = None
-    if df_blank_processed is not None and not df_calibration.empty:
-        blank_final = calculate_concentration_and_mass(df_blank_processed, df_calibration, v_extract)
-        st.markdown("### Надворешна калибрациона - Blank:")
-        st.dataframe(blank_final)
-
-    # Пресметка за samples
-    samples_final = []
-    if sample_tables and not df_calibration.empty:
-        for df_sample in sample_tables:
-            sample_calc = calculate_concentration_and_mass(df_sample, df_calibration, v_extract)
-            samples_final.append(sample_calc)
-            st.markdown(f"### Надворешна калибрациона - Sample {len(samples_final)} :")
-            st.dataframe(sample_calc)
-
-    # Сумирана табела
-    if blank_final is not None and samples_final:
-        all_names = set(blank_final["Name"].unique())
-        for df_s in samples_final:
-            all_names.update(df_s["Name"].unique())
-
-        summary_data = []
-        for name in all_names:
-            row = {"Name": name}
-            blank_mass = blank_final[blank_final["Name"] == name]["Маса (ng)"].sum()
-            row["Blank"] = blank_mass
-            for i, df_s in enumerate(samples_final):
-                sample_mass = df_s[df_s["Name"] == name]["Маса (ng)"].sum()
-                row[f"Sample {i + 1}"] = sample_mass
-            summary_data.append(row)
-
-        df_summary = pd.DataFrame(summary_data)
-
-        st.markdown("### Надворешна калибрациона - сумирано:")
-        st.dataframe(df_summary)
-
-        # Генерирање Excel со сите резултати
-        output = io.BytesIO()
-        with pd.ExcelWriter(output, engine="openpyxl") as writer:
-            blank_final.to_excel(writer, sheet_name="Blank", index=False)
-            for i, df_s in enumerate(samples_final):
-                df_s.to_excel(writer, sheet_name=f"Sample {i + 1}", index=False)
-            df_summary.to_excel(writer, sheet_name="Сумирано", index=False)
-        output.seek(0)
-
-        st.download_button(
-            label="⬇️ Симни ги резултатите во ексел - надворешна калибрациона",
-            data=output,
-            file_name="nadvoresna_kalibraciona.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
-    else:
-        st.warning("Не може да се генерира сумарна табела поради недостасувачки резултати за blank или samples.")
+    return df_result
 
 
+# Пресметка за blank
+blank_final = None
+if df_blank_processed is not None and not df_calibration.empty:
+    blank_final = calculate_concentration_and_mass(df_blank_processed, df_calibration, v_extract)
+    st.markdown("### Надворешна калибрациона - Blank:")
+    st.dataframe(blank_final)
 
-# INTERNA
+# Пресметка за samples
+samples_final = []
+if sample_tables and not df_calibration.empty:
+    for df_sample in sample_tables:
+        sample_calc = calculate_concentration_and_mass(df_sample, df_calibration, v_extract)
+        samples_final.append(sample_calc)
+        st.markdown(f"### Надворешна калибрациона - Sample {len(samples_final)} :")
+        st.dataframe(sample_calc)
+
+# Сумирана табела
+if blank_final is not None and samples_final:
+    all_names = set(blank_final["Name"].unique())
+    for df_s in samples_final:
+        all_names.update(df_s["Name"].unique())
+
+    summary_data = []
+    for name in all_names:
+        row = {"Name": name}
+        blank_mass = blank_final[blank_final["Name"] == name]["Маса (ng)"].sum()
+        row["Blank"] = blank_mass
+        for i, df_s in enumerate(samples_final):
+            sample_mass = df_s[df_s["Name"] == name]["Маса (ng)"].sum()
+            row[f"Sample {i + 1}"] = sample_mass
+        summary_data.append(row)
+
+    df_summary_external = pd.DataFrame(summary_data)  # <-- сменето име
+
+    st.markdown("### Надворешна калибрациона - сумирано:")
+    st.dataframe(df_summary_external)  # <-- сменето име
+
+    # Генерирање Excel со сите резултати
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine="openpyxl") as writer:
+        blank_final.to_excel(writer, sheet_name="Blank", index=False)
+        for i, df_s in enumerate(samples_final):
+            df_s.to_excel(writer, sheet_name=f"Sample {i + 1}", index=False)
+        df_summary_external.to_excel(writer, sheet_name="Сумирано", index=False)  # <-- сменето име
+    output.seek(0)
+
+    st.download_button(
+        label="⬇️ Симни ги резултатите во ексел - надворешна калибрациона",
+        data=output,
+        file_name="nadvoresna_kalibraciona.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+else:
+    st.warning("Не може да се генерира сумарна табела поради недостасувачки резултати за blank или samples.")
+
+
+# INTERNA KALIBRACIJA
 # Осигурај се дека result_df и std_concentrations се дефинирани
 if 'result_df' not in locals():
     result_df = None
@@ -519,111 +512,84 @@ if method_internal_curve and result_df is not None and std_concentrations:
             is_row = df_current[df_current[name_col] == is_name]
 
             if is_row.empty:
-                st.warning(f"⚠️ IS '{is_name}' не е пронајден во {sample_id}.")
+                st.warning(f"IS '{is_name}' не е пронајден во {sample_id}.")
                 continue
 
-            is_height_sample = is_row[height_col_base].values[0]
-            if pd.isna(is_height_sample) or is_height_sample == 0:
-                st.warning(f"⚠️ Висината за IS во {sample_id} не е валидна.")
-                continue
+            is_height_val = is_row[height_col_base].values[0]
 
-            for _, analyte_row in df_current.iterrows():
-                compound_name = analyte_row[name_col]
-                if compound_name == is_name:
+            result_rows = []
+            for idx, row in df_current.iterrows():
+                name = row[name_col]
+                height_val = row[height_col_base]
+
+                # Најди регресија
+                reg_row = df_c_over_cis[df_c_over_cis["Name"] == name]
+                if reg_row.empty or pd.isna(height_val) or pd.isna(is_height_val):
                     continue
 
-                analyte_height = analyte_row[height_col_base]
-                if pd.isna(analyte_height):
-                    continue
+                slope = float(reg_row["c(X)/c(IS)"].values[0])
+                intercept = float(reg_row["Intercept"].values[0])
 
-                hx_over_his = analyte_height / is_height_sample
-                row_reg = df_c_over_cis[df_c_over_cis["Name"] == compound_name]
+                conc = slope * (height_val / is_height_val) + intercept
+                mass = conc * v_extract
 
-                if row_reg.empty:
-                    continue
+                result_rows.append({
+                    "Name": name,
+                    "Height": height_val,
+                    "c(X)/c(IS)": conc,
+                    "Mass (ng)": mass
+                })
 
-                slope = float(row_reg["c(X)/c(IS)"].values[0])
-                intercept = float(row_reg["Intercept"].values[0])
+            df_results_sample = pd.DataFrame(result_rows)
 
-                cx_over_cis = (hx_over_his - intercept) / slope
-                cx = cx_over_cis * c_is_extract
-                final_amt = cx * v_extract
-
-                row_result = {
-                    "Name": compound_name,
-                    "H(X)/H(IS)": hx_over_his,
-                    "C(X)/C(IS)": cx_over_cis,
-                    "C(X)": cx,
-                    "Маса (ng)": final_amt
-                }
-
-                if sample_id == "Blank":
-                    blank_results.append(row_result)
-                else:
-                    row_result["Sample ID"] = sample_id
-                    samples_results.append(row_result)
-
-        df_blank_results = pd.DataFrame(blank_results)
-        df_samples_results = pd.DataFrame(samples_results)
-
-        if df_blank_results.empty or df_samples_results.empty:
-            st.warning("DataFrames се празни, проверете влезните податоци.")
-    
-        st.markdown("### Внатрешна калибрациона - Blank")
-        st.dataframe(df_blank_results)
-
-        st.markdown("### Внатрешна калибрациона - Samples")
-        st.dataframe(df_samples_results)
-
-        # Сумирана табела: секој sample посебна колона
-        # Заштита од празни или невалидни DataFrame-и
-        if df_blank_results.empty or df_samples_results.empty:
-            st.warning("Blank или Sample резултатите се празни - прикачи фајлови.")
-        else:
-            if "Name" in df_blank_results.columns and "Name" in df_samples_results.columns:
-                all_names = set(df_blank_results["Name"].unique()) | set(df_samples_results["Name"].unique())
-                sample_ids = df_samples_results["Sample ID"].unique()
-
-                summary_rows = []
-
-                for name in sorted(all_names):
-                    row = {"Name": name}
-
-                    # Blank
-                    blank_mass = df_blank_results[df_blank_results["Name"] == name]["Маса (ng)"].sum()
-                    row["Blank"] = blank_mass
-
-                    # Секој sample
-                    for sid in sample_ids:
-                        val = df_samples_results[
-                            (df_samples_results["Name"] == name) & 
-                            (df_samples_results["Sample ID"] == sid)
-                        ]["Маса (ng)"].sum()
-                        row[sid] = val
-
-                    summary_rows.append(row)
-
-                df_summary = pd.DataFrame(summary_rows)
-
-                st.markdown("### Внатрешна калибрациона - сумирано")
-                st.dataframe(df_summary)
-
-                # Генерирај Excel
-                output_excel = io.BytesIO()
-                with pd.ExcelWriter(output_excel, engine="openpyxl") as writer:
-                    df_blank_results.to_excel(writer, sheet_name="Blank", index=False)
-                    df_samples_results.to_excel(writer, sheet_name="Samples", index=False)
-                    df_summary.to_excel(writer, sheet_name="Summary", index=False)
-                output_excel.seek(0)
-
-                st.download_button(
-                    label="💾 Симни резултати - внатрешна калибрациона",
-                    data=output_excel.getvalue(),
-                    file_name="vnatresna_kalibraciona.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                )
+            if sample_id == "Blank":
+                blank_results.append(df_results_sample)
+                st.markdown("### Внатрешна калибрациона - Blank")
+                st.dataframe(df_results_sample)
             else:
-                st.error("❌ Недостасува колоната 'Name' во некој од резултатите.")
+                samples_results.append(df_results_sample)
+                st.markdown(f"### Внатрешна калибрациона - {sample_id}")
+                st.dataframe(df_results_sample)
+
+        # Сумирана табела за внатрешна калибрација
+        all_names = set()
+        for df_res in blank_results + samples_results:
+            all_names.update(df_res["Name"].unique())
+
+        summary_rows = []
+        for name in all_names:
+            row = {"Name": name}
+            for i, df_res in enumerate(blank_results):
+                mass_sum = df_res[df_res["Name"] == name]["Mass (ng)"].sum()
+                row[f"Blank {i+1}"] = mass_sum
+            for i, df_res in enumerate(samples_results):
+                mass_sum = df_res[df_res["Name"] == name]["Mass (ng)"].sum()
+                row[f"Sample {i+1}"] = mass_sum
+            summary_rows.append(row)
+
+        df_summary_internal = pd.DataFrame(summary_rows)  # <-- сменето име
+
+        st.markdown("### Внатрешна калибрациона - сумирано")
+        st.dataframe(df_summary_internal)  # <-- сменето име
+
+        # Генерирање Excel
+        output_internal = io.BytesIO()
+        with pd.ExcelWriter(output_internal, engine="openpyxl") as writer:
+            for i, df_res in enumerate(blank_results):
+                df_res.to_excel(writer, sheet_name=f"Blank_{i+1}", index=False)
+            for i, df_res in enumerate(samples_results):
+                df_res.to_excel(writer, sheet_name=f"Sample_{i+1}", index=False)
+            df_summary_internal.to_excel(writer, sheet_name="Summary", index=False)  # <-- сменето име
+        output_internal.seek(0)
+
+        st.download_button(
+            label="⬇️ Симни ги резултатите во ексел - внатрешна калибрациона",
+            data=output_internal,
+            file_name="vnatresna_kalibraciona.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+else:
+    st.warning("Нема доволно податоци за внатрешна калибрациона крива.")
                 
 
 
@@ -729,6 +695,7 @@ df_final = df_corrected[result_cols].copy()
 
 st.markdown("### Финална компаративна табела со едноставно одземени blank вредности:")
 st.dataframe(df_final)
+
 
 
 
