@@ -32,6 +32,16 @@ blank_file = st.file_uploader("Прикачи blank (.xlsx)", type=["xls", "xlsx
 sample_files = st.file_uploader("Прикачи samples (.xlsx)", type=["xls", "xlsx"], accept_multiple_files=True)
 v_extract = st.number_input("Волумен на конечен екстракт (mL)", min_value=0.0, format="%.2f", key="v_extract")
 
+# Креирај табела за Sample ID и името на документот
+sample_mapping = {}
+
+if sample_files:
+    st.markdown("### 🗂️ Идентификација на прикачени samples")
+    for idx, file in enumerate(sample_files):
+        default_sample_id = f"Sample {idx+1}"
+        filename = file.name
+
+
 # --- ако е потребен IS ---
 if method_one_point or method_internal_curve:
     st.markdown("### Внеси податоци за внатрешен стандард ")
@@ -768,6 +778,7 @@ st.download_button(
     file_name='rezultati.xlsx',
     mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 )
+
 
 
 
