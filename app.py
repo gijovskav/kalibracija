@@ -507,7 +507,7 @@ if method_internal_curve and result_df is not None and std_concentrations:
         blank_results = []
         samples_results = []
 
-        ffor sample_id in df_all_samples["Sample ID"].unique():
+        for sample_id in df_all_samples["Sample ID"].unique():
             df_current = df_all_samples[df_all_samples["Sample ID"] == sample_id]
             is_row = df_current[df_current[name_col] == is_name]
 
@@ -769,6 +769,7 @@ st.download_button(
     file_name='rezultati.xlsx',
     mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 )
+
 
 
 
