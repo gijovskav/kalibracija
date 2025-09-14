@@ -450,7 +450,7 @@ if 'std_concentrations' not in locals():
 if method_internal_curve and result_df is not None and std_concentrations:
 
     # 1. Пресметај C(X)/C(IS) регресија базирана на H(X)/H(IS)
-    std_conc_norm = np.array(std_concentrations) / std_concentrations[0]
+    std_conc_norm = np.array(std_concentrations) / c_is_extract
     std_conc_norm = std_conc_norm.reshape(-1, 1)
 
     # Подготви ratio_df = H(X)/H(IS) за секој стандард
@@ -785,6 +785,7 @@ st.download_button(
     file_name='rezultati.xlsx',
     mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 )
+
 
 
 
