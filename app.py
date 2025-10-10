@@ -7,44 +7,59 @@ from io import BytesIO
 import re
 
 
+st.title("Брза калибрација")
+
+
 df_std = None
 df_blank_processed = None
 sample_tables = []
 summary = None
-
-st.title("Брза калибрација")
-
 std_dataframes = []
 df_blank_results = pd.DataFrame()
 df_samples_results = pd.DataFrame()
 
 
 
-# --- Избор на методи ---
-st.markdown("### Избери една или повеќе методи за калибрација:")
-method_one_point = st.checkbox("Калибрација со една точка")
+# Избор на метода
+st.markdown("### Изберете методи за калибрација:")
+method_one_point = st.checkbox("Калибрација со внатрешен стандард")
 method_internal_curve = st.checkbox("Калибрација со калибрациона права со внатрешен стандард")
 method_external_curve = st.checkbox("Калибрација со надворешна калибрациона права")
 
-# --- Заеднички полиња ---
-st.markdown("### Проби за анализа")
-blank_file = st.file_uploader("Прикачи blank (.xlsx)", type=["xls", "xlsx"])
-sample_files = st.file_uploader("Прикачи samples (.xlsx)", type=["xls", "xlsx"], accept_multiple_files=True)
-v_extract = st.number_input("Волумен на конечен екстракт (mL)", min_value=0.0, format="%.2f", key="v_extract")
+# Заеднички полиња
+st.markdown("### Влезни податоци за анализа")
+blank_file = st.file_uploader("Слепа проба", type=["xls", "xlsx"])
+sample_files = st.file_uploader("Примероци за анализа", type=["xls", "xlsx"], accept_multiple_files=True)
+v_extract = st.number_input("Волумен на конечен екстракт (mL)", min_value=0.0, format="%.1f", key="v_extract")
 
-# Креирај табела за Sample ID и името на документот
 sample_mapping = {}
 
 if sample_files:
-    st.markdown("### 🗂️ Sample датотеки и доделени имиња")
-    
+    st.markdown("### 🗂️ Прикачени примероци и имиња")
+
     mapping_data = []
     for idx, file in enumerate(sample_files):
-        sample_id = f"Sample {idx+1}"
+        default_id = f"Sample {idx+1}"
         filename = file.name
-        sample_mapping[filename] = sample_id
-        mapping_data.append({"Sample ID": sample_id, "Име на датотека": filename})
-    
+
+        # Поле каде корисникот може да го преименува примерокот
+        custom_name = st.text_input(
+            f"Внеси име за {default_id}",
+            value=default_id,
+            key=f"sample_name_{idx}"
+        )
+
+        # Го запишуваме во речникот
+        sample_mapping[filename] = custom_name
+
+        # Податоци за приказ во табела
+        mapping_data.append({
+            "Sample ID": default_id,
+            "Име на датотека": filename,
+            "Корисничко име": custom_name
+        })
+
+    # Прикажи табела со стандардни и кориснички имиња
     df_mapping = pd.DataFrame(mapping_data)
     st.dataframe(df_mapping)
 
@@ -785,6 +800,7 @@ st.download_button(
     file_name='rezultati.xlsx',
     mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 )
+
 
 
 
