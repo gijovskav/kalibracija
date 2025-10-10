@@ -104,6 +104,9 @@ if method_internal_curve or method_external_curve or (method_one_point and (meth
 st.markdown("---")
 
 
+#пресметки
+presmetaj = st.button("Започни пресметка")
+if presmetaj:
 # PRVA METODA
 if method_one_point:
     def find_column(df, possible_names):
@@ -790,6 +793,7 @@ st.download_button(
     file_name='rezultati.xlsx',
     mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 )
+
 
 
 
