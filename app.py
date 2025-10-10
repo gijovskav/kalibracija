@@ -35,14 +35,14 @@ v_extract = st.number_input("Волумен на конечен екстракт
 sample_mapping = {}
 
 if sample_files:
-    st.markdown("### 🗂️ Прикачени примероци и имиња")
+    st.markdown("### Именување")
 
     mapping_data = []
     for idx, file in enumerate(sample_files):
         default_id = f"Sample {idx+1}"
         filename = file.name
 
-        # Поле каде корисникот може да го преименува примерокот
+        # Прекрстување на фајл
         custom_name = st.text_input(
             f"Внеси име за {default_id}",
             value=default_id,
@@ -54,50 +54,43 @@ if sample_files:
 
         # Податоци за приказ во табела
         mapping_data.append({
-            "Sample ID": default_id,
+            "Реден број": default_id,
             "Име на датотека": filename,
             "Корисничко име": custom_name
         })
 
-    # Прикажи табела со стандардни и кориснички имиња
+    # Приказ на табелата
     df_mapping = pd.DataFrame(mapping_data)
     st.dataframe(df_mapping)
 
 
-# --- ако е потребен IS ---
+# Податоци за вантрешниот стандард
 if method_one_point or method_internal_curve:
-    st.markdown("### Внеси податоци за внатрешен стандард ")
+    st.markdown("### Податоци за внатрешен стандард")
     is_name = st.text_input("Име на внатрешен стандард (како во Excel)", key="is_name")
 
- # --- Метод 1: Една точка ---
 if method_one_point:
-    st.markdown("### Параметри за метода: Калибрација со една точка")
-    c_is_start = st.number_input("Почетна концентрација на IS (µg/L)", min_value=0.0, format="%.3f", key="c_is_start")
+    st.markdown("### Податоци за внатрешна калибрација")
+    c_is_start = st.number_input("Почетна концентрација на внатрешниот стандард (µg/L)", min_value=0.0, format="%.1f", key="c_is_start")
 
-    st.markdown("#### Прикачи стандард за калибрација со една точка:")
-    std_file_one_point = st.file_uploader("Стандард (1 документ)", type=["xls", "xlsx"], key="onep_file")
-    conc_one_point = st.number_input("Концентрација на Стандардот (µg/L)", min_value=0.0, format="%.3f", key="onep_conc")
+    st.markdown("#### Стандард за внатрешна калибрација (една точка):")
+    std_file_one_point = st.file_uploader("Стандард (еден документ)", type=["xls", "xlsx"], key="onep_file")
+    conc_one_point = st.number_input("Концентрација на стандардот (µg/L)", min_value=0.0, format="%.1f", key="onep_conc")
 
-
-        # --- Метод 2: Внатрешна калибрациона крива ---
 if method_internal_curve:
-    st.markdown("### Параметри за метода: Калибрациона права со внатрешен стандард")
-    c_is_extract = st.number_input("Концентрација на IS во екстракт (µg/L)", min_value=0.0, format="%.3f", key="c_is_extract")
+    st.markdown("### Податоци за калибрациони прави")
+    c_is_extract = st.number_input("Концентрација на внатрешен стандард во екстракт (µg/L)", min_value=0.0, format="%.1f", key="c_is_extract")
 
 
-      # --- Серија на стандарди (една за сите методи што ја користат) ---
 if method_internal_curve or method_external_curve or (method_one_point and (method_internal_curve or method_external_curve)):
-    st.markdown("### Серија на стандарди за калибрациона крива")
+    st.markdown("### Серија на стандарди")
 
-
-    # Барање број на стандарди само еднаш
-    num_standards = st.number_input("Колку стандарди ќе користите? ", min_value=1, max_value=20, value=5, step=1)
+    num_standards = st.number_input("Колку стандарди ќе користите? ", min_value=3, max_value=20, value=3, step=1)
 
     uploaded_std_files = []
     std_concentrations = []
     std_dataframes = []
 
-    # Ако корисникот избрал број на стандарди > 0, прикажи полета за внес
     if num_standards > 0:
         for i in range(num_standards):
             cols = st.columns(2)
@@ -105,13 +98,10 @@ if method_internal_curve or method_external_curve or (method_one_point and (meth
                 file = st.file_uploader(f"Стандард {i+1} – Excel фајл", type=["xls", "xlsx"], key=f"std_file_{i}")
                 uploaded_std_files.append(file)
             with cols[1]:
-                conc = st.number_input(f"Концентрација за стандард {i+1} (µg/L)", min_value=0.0, format="%.4f", key=f"std_conc_{i}")
+                conc = st.number_input(f"Концентрација за стандард {i+1} (µg/L)", min_value=0.0, format="%.1f", key=f"std_conc_{i}")
                 std_concentrations.append(conc)
 
-
-# --- Крај ---
 st.markdown("---")
-st.success("Внеси ги сите потребни податоци според избраните методи.")
 
 
 # PRVA METODA
@@ -800,6 +790,7 @@ st.download_button(
     file_name='rezultati.xlsx',
     mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 )
+
 
 
 
