@@ -39,12 +39,12 @@ if sample_files:
 
     mapping_data = []
     for idx, file in enumerate(sample_files):
-        default_id = f"Sample {idx+1}"
+        default_id = f"Примерок {idx+1}"
         filename = file.name
 
         # Прекрстување на фајл
         custom_name = st.text_input(
-            f"Внеси име за {default_id}",
+            f"Корисничко име за {default_id}",
             value=default_id,
             key=f"sample_name_{idx}"
         )
@@ -790,6 +790,7 @@ st.download_button(
     file_name='rezultati.xlsx',
     mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 )
+
 
 
 
