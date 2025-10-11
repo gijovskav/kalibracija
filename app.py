@@ -58,9 +58,71 @@ if sample_files:
             "Корисничко име": custom_name
         })
 
-    # Приказ на табелата
     df_mapping = pd.DataFrame(mapping_data)
     st.dataframe(df_mapping)
+
+import re
+
+def _build_name_map(sample_files, sample_mapping):
+    m = {}
+    for i, f in enumerate(sample_files or [], start=1):
+        default = f"Sample {i}"
+        custom = sample_mapping.get(getattr(f, "name", ""), f"Примерок {i}")
+        m[default] = custom
+    m["Blank"] = "Слепа проба"
+    return m
+
+def _replace_text_tokens(text, name_map):
+    if not isinstance(text, str) or not name_map:
+        return text
+    out = text
+    # подолгите клучеви прво, за да нема делумни замени
+    for k in sorted(name_map.keys(), key=len, reverse=True):
+        out = re.sub(rf"\b{re.escape(k)}\b", name_map[k], out)
+    return out
+
+def _replace_df_labels(df, name_map):
+    if not isinstance(df, pd.DataFrame) or not name_map:
+        return df
+    df2 = df.copy()
+    df2.columns = [_replace_text_tokens(str(c), name_map) for c in df2.columns]
+    if df2.index.dtype == "object":
+        df2.index = [_replace_text_tokens(str(ix), name_map) for ix in df2.index]
+    if df2.index.name:
+        df2.index.name = _replace_text_tokens(str(df2.index.name), name_map)
+    return df2
+
+# изградете мапа еднаш по именувањето
+_name_map = _build_name_map(sample_files, sample_mapping)
+
+# --- патчирање на streamlit прикази (само текст/табели) ---
+_st_markdown = st.markdown
+def _patched_markdown(body, *args, **kwargs):
+    return _st_markdown(_replace_text_tokens(body, _name_map), *args, **kwargs)
+st.markdown = _patched_markdown
+
+_st_write = st.write
+def _patched_write(*args, **kwargs):
+    patched = [ _replace_text_tokens(a, _name_map) if isinstance(a, str) else a for a in args ]
+    return _st_write(*patched, **kwargs)
+st.write = _patched_write
+
+_st_data_frame = st.dataframe
+def _patched_dataframe(data=None, *args, **kwargs):
+    data = _replace_df_labels(data, _name_map) if isinstance(data, pd.DataFrame) else data
+    return _st_data_frame(data, *args, **kwargs)
+st.dataframe = _patched_dataframe
+
+# --- патчирање на pandas.to_excel за лист-имиња и колони ---
+_pd_to_excel = pd.DataFrame.to_excel
+def _patched_to_excel(self, excel_writer, sheet_name="Sheet1", *args, **kwargs):
+    sheet_name = _replace_text_tokens(sheet_name, _name_map)
+    df2 = _replace_df_labels(self, _name_map)
+    # Excel limit 31 знаци за име на лист
+    sheet_name = sheet_name[:31] if isinstance(sheet_name, str) else sheet_name
+    return _pd_to_excel(df2, excel_writer, sheet_name=sheet_name, *args, **kwargs)
+pd.DataFrame.to_excel = _patched_to_excel
+
 
 
 # Податоци за вантрешниот стандард
@@ -832,6 +894,7 @@ if presmetaj:
     
     
     
+
 
 
 
