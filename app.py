@@ -156,28 +156,22 @@ if presmetaj:
 
     
         def normalize_columns(df):
-            name_cols = [col for col in df.columns if col.strip().lower() in ['name', 'compound']]
-    
-            # Препознавање на RT колона
-            rt_cols = [col for col in df.columns if any(x in col.lower() for x in ['rt (min)', 'rt'])]
-    
-            # Препознавање на Height колона
-            height_cols = [col for col in df.columns if 'height' in col.lower()]
-    
-            norm_df = pd.DataFrame()
-    
-            # Избор на соодветни колони, ако се најдени
-            norm_df['Name'] = df[name_cols[0]] if name_cols else None
-            norm_df['RT (min)'] = df[rt_cols[0]] if rt_cols else None
-            norm_df['Height (Hz)'] = df[height_cols[0]] if height_cols else None
-    
-            return norm_df
+             name_cols = [col for col in df.columns if col.strip().lower() in ['name', 'compound', 'соединение']]
+                rt_cols = [col for col in df.columns if any(x in col.lower() for x in ['rt (min)', 'rt', 'време на задржување'])]
+                height_cols = [col for col in df.columns if any(x in col.lower() for x in ['height', 'висина'])]
+            
+                norm_df = pd.DataFrame()
+                norm_df['Соединение'] = df[name_cols[0]] if name_cols else None
+                norm_df['RT (min)'] = df[rt_cols[0]] if rt_cols else None
+                norm_df['Висина (Hz)'] = df[height_cols[0]] if height_cols else None
+
+                return norm_df
     
         def process_sample(df_sample, df_std, c_is_start, v_extract, is_name):
             # Наоѓање на IS висина во sample
             is_mask_sample = df_sample['Name'].astype(str) == is_name
             if not is_mask_sample.any():
-                st.error(f"Внатрешниот стандард '{is_name}' не е пронајден во sample документ.")
+                st.error(f"Внатрешниот стандард '{is_name}' не е пронајден во сите документи со проби.")
                 return None
             
             height_is_sample = df_sample.loc[is_mask_sample, 'Height (Hz)'].values[0]
@@ -187,41 +181,53 @@ if presmetaj:
     
             # Наоѓање RRF од стандарди според Name
             def get_rrf(name):
-                match = df_std[df_std['Name'] == name]
+                match = df_std[df_std['Соединение'] == name]
                 if not match.empty:
                     return match['RRF'].values[0]
                 else:
                     return None
+
     
-            df_sample['RRF'] = df_sample['Name'].apply(get_rrf)
+            df_sample['RRF'] = df_sample['Соединение'].apply(get_rrf)
     
             # Пресметка на c(X)
-            df_sample['c(X) / µg L-1'] = df_sample.apply(lambda row: 
-                (row['Height (Hz)'] / height_is_sample) * (c_is_start / row['RRF']) 
-                if row['RRF'] else None, axis=1)
+            df_sample['Концентрација c(X) / µg/L'] = df_sample.apply(
+        lambda row: (row['Висина (Hz)'] / height_is_sample) * (c_is_start / row['Релативен фактор на одговор (RRF)'])
+        if row['Релативен фактор на одговор (RRF)'] else None, axis=1
+    )
+    df_sample['Маса (ng)'] = df_sample['Концентрација c(X) / µg/L'] * v_extract
+
+    return df_sample[['Ред. бр.', 'Соединение', 'RT (min)', 'Висина (Hz)',
+                      'RRF', 'Концентрација c(X) / µg/L', 'Маса (ng)']]
     
-            # Пресметка на маса во ng
-            df_sample['Маса (ng)'] = df_sample['c(X) / µg L-1'] * v_extract
-    
-            return df_sample[['Ред. бр.', 'Name', 'RT (min)', 'Height (Hz)', 'RRF', 'c(X) / µg L-1', 'Маса (ng)']]
-    
-           # --- Пример за blank обработка ---
+           # Слепи проби - пресметки
         if blank_file is not None:
             blank_df = pd.read_excel(blank_file)
             df_blank_processed = process_sample(blank_df, df_std, c_is_start, v_extract, is_name)
             if df_blank_processed is not None:
-                st.markdown("### Калибрација со една точка - Blank:")
+                st.markdown("### Слепа проба (внатрешна калибрација со една точка):")
                 st.dataframe(df_blank_processed)
     
         # --- Пример за samples обработка ---
         sample_tables = []
+
         for idx, sample_file in enumerate(sample_files):
+            # Земаме го името што го внел корисникот (ако не, автоматски Примерок 1, 2 итн.)
+            sample_name = sample_mapping.get(sample_file.name, f"Примерок {idx + 1}")
+            
+            # Читање на Excel документот
             sample_df = pd.read_excel(sample_file)
+            
+            # Обработка на податоците
             df_sample_processed = process_sample(sample_df, df_std, c_is_start, v_extract, is_name)
-            if df_sample_processed is not None:
-                st.markdown(f"### Калибрација со една точка - Sample {idx + 1}:")
-                st.dataframe(df_sample_processed)
-                sample_tables.append(df_sample_processed)
+    
+    if df_sample_processed is not None:
+        # Приказ на табела со името на примерокот
+        st.markdown(f"### {sample_name} – резултати (внатрешна калибрација со една точка)")
+        st.dataframe(df_sample_processed.set_index("Ред. бр."))
+        
+        # Додавање во листата за понатамошна обработка
+        sample_tables.append((sample_name, df_sample_processed)
     
         # --- Сумарна табела со сите соединенија и маси во blank и samples ---
         if df_blank_processed is not None and sample_tables:
@@ -820,6 +826,7 @@ if presmetaj:
     
     
     
+
 
 
 
