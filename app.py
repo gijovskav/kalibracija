@@ -680,137 +680,180 @@ if presmetaj:
     
     
     
-    # Крајна табела
-
-# --- Финални табели (секогаш три) ---
-
-def normalize_name_column(df):
-    df = df.copy()
-    if 'Name' in df.columns:
-        df = df.rename(columns={'Name': 'Соединение'})
-    return df
-
-# 1️⃣ Основна комбинирана табела
-available_dfs = []
-
-if 'summary' in locals() and isinstance(summary, pd.DataFrame) and not summary.empty:
-    available_dfs.append((summary, "One Point"))
-if 'df_summary_internal' in locals() and isinstance(df_summary_internal, pd.DataFrame) and not df_summary_internal.empty:
-    available_dfs.append((df_summary_internal, "Internal Curve"))
-if 'df_summary_external' in locals() and isinstance(df_summary_external, pd.DataFrame) and not df_summary_external.empty:
-    available_dfs.append((df_summary_external, "External Curve"))
-
-# Ако нема ништо достапно, создај празна табела со колона Соединение
-if not available_dfs:
-    df_combined = pd.DataFrame({"Соединение": []})
-else:
-    first_df = normalize_name_column(available_dfs[0][0])
-    df_combined = first_df[["Соединение"]].copy()
-
-    for df_method, method_name in available_dfs:
-        df_method = normalize_name_column(df_method)
-        numeric_cols = [c for c in df_method.columns if c != "Соединение"]
-        for c in numeric_cols:
-            df_combined[f"{c} ({method_name})"] = df_method[c].values if len(df_method) == len(df_combined) else 0
-
-df_combined = df_combined.fillna(0)
-st.markdown("### Финална табела:")
-st.dataframe(df_combined)
-
-
-# 2️⃣ Табела со коригирани вредности (одземање на слепа проба)
-df_final = df_combined.copy()
-for col in df_combined.columns:
-    if "Слепа проба" in col or "Blank" in col:
-        method_match = re.search(r'\((.*?)\)', col)
-        if method_match:
+   #krajna tabela
+    
+    # --- Функција за нормализација на 'Name' колона ---
+    def normalize_name_column(df):
+        df = df.copy()
+        if 'Name' in df.columns:
+            df['Name'] = df['Name'].astype(str).str.strip().str.lower()
+        return df
+    
+    # --- Земи ги имињата од стандардните DataFrame-ови ---
+    std_names = []
+    
+    if method_one_point and not (method_internal_curve or method_external_curve):
+        if 'df_std' in locals() and isinstance(df_std, pd.DataFrame) and 'Name' in df_std.columns:
+            df_std['Name'] = df_std['Name'].astype(str).str.strip().str.lower()
+            std_names = df_std['Name'].dropna().unique().tolist()
+    else:
+        combined_std_df = pd.concat(std_dataframes, ignore_index=True) if std_dataframes else pd.DataFrame()
+        if not combined_std_df.empty and 'Name' in combined_std_df.columns:
+            combined_std_df['Name'] = combined_std_df['Name'].astype(str).str.strip().str.lower()
+            std_names = combined_std_df['Name'].dropna().unique().tolist()
+    
+    # --- Почетна табела со имиња од стандардот ---
+    df_combined = pd.DataFrame({'Name': sorted(std_names)})
+    
+    # --- Подготовка на листа со DataFrame-ови за спојување ---
+    dfs_to_merge = []
+    
+    # Вметни го One Point
+    summary = locals().get('summary')
+    if isinstance(summary, pd.DataFrame) and not summary.empty:
+        df_1p = normalize_name_column(summary)
+        df_1p = df_1p.rename(columns=lambda c: f"{c} (One Point)" if c != 'Name' else c)
+        dfs_to_merge.append(df_1p)
+    
+    # Вметни го External Curve
+    df_summary_external = locals().get('df_summary_external')
+    if isinstance(df_summary_external, pd.DataFrame) and not df_summary_external.empty:
+        df_external = normalize_name_column(df_summary_external)
+        df_external = df_external.rename(columns=lambda c: f"{c} (External Curve)" if c != 'Name' else c)
+        dfs_to_merge.append(df_external)
+    
+    # Вметни го Internal Curve
+    df_summary_internal = locals().get('df_summary_internal')
+    if isinstance(df_summary_internal, pd.DataFrame) and not df_summary_internal.empty:
+        df_internal = normalize_name_column(df_summary_internal)
+        df_internal = df_internal.rename(columns=lambda c: f"{c} (Internal Curve)" if c != 'Name' else c)
+        dfs_to_merge.append(df_internal)
+    
+    
+    
+    # --- Спојување според 'Name' колона ---
+    for df_method in dfs_to_merge:
+        df_combined = df_combined.merge(df_method, on='Name', how='left')
+    
+    # --- Пополнување празни вредности со 0 ---
+    df_combined = df_combined.fillna(0)
+    
+    # --- Прикажи ја комбинованата табела со сите методи ---
+    st.markdown("### Финална табела:")
+    st.dataframe(df_combined)
+    
+    
+    
+    
+    #odzemanja
+    import re
+    
+    df_corrected = df_combined.copy()
+    
+    methods = ['One Point', 'Internal Curve', 'External Curve']
+    
+    for method in methods:
+        # Наоѓање sample колони што содржат методот во заграда (пример: "Sample 1 (One Point)")
+        sample_cols = [col for col in df_corrected.columns if re.search(rf"sample\s*\d+.*\({re.escape(method)}\)", col, flags=re.IGNORECASE)]
+    
+        # Наоѓање blank колона со методот во заграда (пример: "Blank (One Point)")
+        blank_col = next((col for col in df_corrected.columns if re.search(rf"blank.*\({re.escape(method)}\)", col, flags=re.IGNORECASE)), None)
+    
+        if not blank_col or not sample_cols:
+            # Ако нема blank колона или нема sample колони за овој метод, прескокни
+            continue
+    
+        for sample_col in sample_cols:
+            # Извлекување на бројот од sample колоната, на пример "Sample 1"
+            match = re.search(r'sample\s*(\d+)', sample_col, flags=re.IGNORECASE)
+            if not match:
+                continue
+            sample_num = match.group(1)
+    
+            # Име на новата колона со резултат после одземање
+            new_col = f"Sample {sample_num} - Blank ({method})"
+    
+            # Одземање на blank од sample колона
+            df_corrected[new_col] = df_corrected[sample_col] - df_corrected[blank_col]
+    
+    # Избери само 'Name' и новите колони со одземени вредности
+    result_cols = ['Name'] + [col for col in df_corrected.columns if ' - Blank (' in col]
+    df_final = df_corrected[result_cols].copy()
+    
+    st.markdown("### Финална табела со коригирани вредности:")
+    st.dataframe(df_final)
+    
+    
+    
+    #finalna reoorganizirana
+    import re
+    
+    # Земаме колони кои се одземаат (на пример: "Sample 1 - Blank (One Point)")
+    blank_cols = [col for col in df_corrected.columns if ' - Blank (' in col]
+    
+    # Ќе направиме речник: key=sample_num, value=list на колони (со сите методи)
+    sample_dict = {}
+    
+    for col in blank_cols:
+        # Извлечи бројка од sample колона
+        sample_match = re.search(r'Sample (\d+)', col)
+        method_match = re.search(r'\((.+)\)', col)  # методот во заграда
+        if sample_match and method_match:
+            sample_num = sample_match.group(1)
             method = method_match.group(1)
-            for other_col in df_combined.columns:
-                if other_col != col and f"({method})" in other_col:
-                    new_col = other_col.replace(f"({method})", f"- Слепа проба ({method})")
-                    df_final[new_col] = df_combined[other_col] - df_combined[col]
-
-df_final = df_final.fillna(0)
-st.markdown("### Финална табела со коригирани вредности:")
-st.dataframe(df_final)
-
-
-# 3️⃣ Реорганизирана табела за споредба на методи
-df_reorganized = pd.DataFrame()
-if not df_final.empty:
-    cols = [c for c in df_final.columns if c != "Соединение"]
-    method_map = {}
-    for c in cols:
-        match = re.search(r"\((.*?)\)", c)
-        if match:
-            method = match.group(1)
-            method_map.setdefault(method, []).append(c)
-
-    ordered_cols = ["Соединение"]
-    for m in ["One Point", "Internal Curve", "External Curve"]:
-        if m in method_map:
-            ordered_cols.extend(method_map[m])
-
-    df_reorganized = df_final[ordered_cols].copy()
-
-st.markdown("### Табела за споредба на методи:")
-st.dataframe(df_reorganized)
-
-
-# 4️⃣ Експорт во Excel
-def to_excel(dfs: dict):
-    output = io.BytesIO()
-    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-        for sheet_name, df in dfs.items():
-            if not df.empty:
-                df.to_excel(writer, index=False, sheet_name=sheet_name[:31])
-    return output.getvalue()
-
-dfs_to_export = {
-    'Финална табела': df_combined,
-    'Коригирана табела': df_final,
-    'Реорганизирана табела': df_reorganized
-}
-
-excel_data = to_excel(dfs_to_export)
-
-st.download_button(
-    label="⬇️ Симни ги сите финални табели како Excel",
-    data=excel_data,
-    file_name='финални_табели.xlsx',
-    mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    
+            if sample_num not in sample_dict:
+                sample_dict[sample_num] = []
+            sample_dict[sample_num].append((method, col))
+    
+    # Сега ќе направиме нова листа колони за редослед: за секој sample по методи сортирано (на пример алфабетски по метод)
+    new_cols = ['Name']
+    
+    for sample_num in sorted(sample_dict.keys(), key=int):
+        # Сортираме по метод за поубава презентација (можеш и по некој хемиски ред ако сакаш)
+        methods_cols_sorted = sorted(sample_dict[sample_num], key=lambda x: x[0])
+        for method, col in methods_cols_sorted:
+            # За името на колоната правиме "Sample 1 - One Point"
+            new_col_name = col.replace(" - Blank (", " - ").replace(")", "")
+            df_corrected.rename(columns={col: new_col_name}, inplace=True)
+            new_cols.append(new_col_name)
+    
+    # Направи нова табела со редоследот
+    df_reorganized = df_corrected[new_cols].copy()
+    
+    st.markdown("### Табела за споредба на методи:")
+    st.dataframe(df_reorganized)
+    
+    
+    #ексел за трите табели
+    # Функција за експортирање на повеќе DataFrame во еден Excel фајл со повеќе sheet-ови
+    def to_excel(dfs: dict):
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+            for sheet_name, df in dfs.items():
+                df.to_excel(writer, index=False, sheet_name=sheet_name)
+            # writer.save()  # Оваа линија се брише
+        processed_data = output.getvalue()
+        return processed_data
+    
+    
+    # Словар со сите DataFrame-ови што сакаш да ги експортираш
+    dfs_to_export = {
+        'Финална табела': df_combined,
+        'Компаративна (одземени blank)': df_final,
+        'Реорганизирана по samples': df_reorganized
+    }
+    
+    # Креирање на Excel фајл во меморија
+    excel_data = to_excel(dfs_to_export)
+    
+    # Копче за симнување
+    st.download_button(
+        label="Симни ги сумарните табели како Ексел",
+        data=excel_data,
+        file_name='rezultati.xlsx',
+        mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+    
+    
 
