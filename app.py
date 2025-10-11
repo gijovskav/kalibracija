@@ -30,28 +30,10 @@ st.markdown("### Влезни податоци за анализа")
 blank_file = st.file_uploader("Слепа проба", type=["xls", "xlsx"])
 sample_files = st.file_uploader("Примероци за анализа", type=["xls", "xlsx"], accept_multiple_files=True)
 v_extract = st.number_input("Волумен на конечен екстракт (mL)", min_value=0.0, format="%.1f", key="v_extract")
-decimal_places = st.number_input(
-    "Број на децимални места во резултати",
-    min_value=0,
-    max_value=6,
-    value=2,
-    step=1,
-    key="decimal_places",
-)
+decimals = st.number_input("Број на децимални цифри во резултати", min_value=0, max_value=6, value=1, step=1, key="decimals")
+
 
 sample_mapping = {}
-
-
-def _round_numeric(df):
-    if not isinstance(df, pd.DataFrame):
-        return df
-
-    decimals = int(decimal_places) if decimal_places is not None else 2
-    df2 = df.copy()
-    numeric_cols = df2.select_dtypes(include=[np.number]).columns
-    if len(numeric_cols) > 0:
-        df2[numeric_cols] = df2[numeric_cols].round(decimals)
-    return df2
 
 if sample_files:
     st.markdown("### Именување")
@@ -123,23 +105,13 @@ st.markdown = _patched_markdown
 
 _st_write = st.write
 def _patched_write(*args, **kwargs):
-    patched = []
-    for a in args:
-        if isinstance(a, str):
-            patched.append(_replace_text_tokens(a, _name_map))
-        elif isinstance(a, pd.DataFrame):
-            df_tmp = _replace_df_labels(a, _name_map)
-            patched.append(_round_numeric(df_tmp))
-        else:
-            patched.append(a)
+    patched = [ _replace_text_tokens(a, _name_map) if isinstance(a, str) else a for a in args ]
     return _st_write(*patched, **kwargs)
 st.write = _patched_write
 
 _st_data_frame = st.dataframe
 def _patched_dataframe(data=None, *args, **kwargs):
-    if isinstance(data, pd.DataFrame):
-        data = _replace_df_labels(data, _name_map)
-        data = _round_numeric(data)
+    data = _replace_df_labels(data, _name_map) if isinstance(data, pd.DataFrame) else data
     return _st_data_frame(data, *args, **kwargs)
 st.dataframe = _patched_dataframe
 
@@ -148,7 +120,6 @@ _pd_to_excel = pd.DataFrame.to_excel
 def _patched_to_excel(self, excel_writer, sheet_name="Sheet1", *args, **kwargs):
     sheet_name = _replace_text_tokens(sheet_name, _name_map)
     df2 = _replace_df_labels(self, _name_map)
-    df2 = _round_numeric(df2)
     # Excel limit 31 знаци за име на лист
     sheet_name = sheet_name[:31] if isinstance(sheet_name, str) else sheet_name
     return _pd_to_excel(df2, excel_writer, sheet_name=sheet_name, *args, **kwargs)
@@ -887,16 +858,5 @@ if presmetaj:
     )
     
     
-
-
-
-
-
-
-
-
-
-
-
 
 
