@@ -17,6 +17,18 @@ summary = None
 std_dataframes = []
 df_blank_results = pd.DataFrame()
 df_samples_results = pd.DataFrame()
+
+# --- Универзална функција за заокружување и заменување None/NaN ---
+def round_and_flag(df, decimals):
+    if not isinstance(df, pd.DataFrame) or df.empty:
+        return df
+    out = df.copy()
+    num_cols = out.select_dtypes(include=[np.number]).columns
+    if len(num_cols):
+        out[num_cols] = out[num_cols].round(decimals)
+    out = out.replace({None: np.nan})
+    out = out.where(pd.notna(out), "Not detected")
+    return out
     
 
 # Избор на метода
@@ -858,6 +870,7 @@ if presmetaj:
     )
     
     
+
 
 
 
