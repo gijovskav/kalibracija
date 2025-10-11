@@ -453,7 +453,8 @@ if presmetaj:
     
     # Пресметка за blank
     blank_final = None
-    if df_blank_processed is not None and not df_calibration.empty:
+    if 'df_blank_processed' in locals() and isinstance(df_blank_processed, pd.DataFrame) and not df_blank_processed.empty:
+    if 'df_calibration' in locals() and isinstance(df_calibration, pd.DataFrame) and not df_calibration.empty:
         blank_final = calculate_concentration_and_mass(df_blank_processed, df_calibration, v_extract)
         st.markdown("### Слепа проба - надворешна калибрациона права:")
         st.dataframe(blank_final)
@@ -838,6 +839,7 @@ if dfs_to_export:
     
     
     
+
 
 
 
