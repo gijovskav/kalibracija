@@ -116,7 +116,6 @@ if presmetaj:
                     return name
             return None
     
-        # 1) Читање и подготовка на документот со стандарди
         if std_file_one_point is not None:
             df_std = pd.read_excel(std_file_one_point)
     
@@ -134,7 +133,7 @@ if presmetaj:
                     height_is = df_std.loc[is_mask, height_col].values[0]
     
                     # Пресметка на релативен фактор на одговор (RRF)
-                    df_std['Релативен фактор на одговор (RRF)'] = df_std.apply(
+                     df_std['RRF'] = df_std.apply(
                         lambda row: (row[height_col] / height_is) * (c_is_start / conc_one_point)
                         if row[name_col] != is_name else 1.0,
                         axis=1
@@ -150,7 +149,7 @@ if presmetaj:
     
                     st.markdown("### Табела со релативни фактори на одговор (RRF)")
                     st.dataframe(
-                        df_std[["Ред. бр.", "Соединение", "RT (min)", "Висина (Hz)", "Релативен фактор на одговор (RRF)"]]
+                        df_std[["Ред. бр.", "Соединение", "RT (min)", "Висина (Hz)", "RRF"]]
                         .set_index("Ред. бр.")
                     )
     
@@ -160,15 +159,14 @@ if presmetaj:
                         rt_cols     = [c for c in df.columns if any(x in c.lower() for x in ['rt (min)', 'rt', 'време на задржување'])]
                         height_cols = [c for c in df.columns if any(x in c.lower() for x in ['height', 'висина'])]
     
-                        out = pd.DataFrame()
-                        out['Соединение'] = df[name_cols[0]]   if name_cols   else None
-                        out['RT (min)']   = df[rt_cols[0]]     if rt_cols     else None
-                        out['Висина (Hz)'] = df[height_cols[0]] if height_cols else None
-                        return out
+                        norm_df = pd.DataFrame()
+                        norm_df['Name'] = df[name_cols[0]] if name_cols else None
+                        norm_df['RT (min)'] = df[rt_cols[0]] if rt_cols else None
+                        norm_df['Height (Hz)'] = df[height_cols[0]] if height_cols else None
+                
+                        return norm_df
     
-                    # 3) Обработка на поединечен примерок/слепа проба
                     def process_sample(df_sample, df_std, c_is_start, v_extract, is_name):
-                        # очекува веќе нормализирани колони
                         is_mask_sample = df_sample['Соединение'].astype(str) == is_name
                         if not is_mask_sample.any():
                             st.error(f"Внатрешниот стандард '{is_name}' не е пронајден во документот со примерокот.")
@@ -195,12 +193,11 @@ if presmetaj:
                                           'Релативен фактор на одговор (RRF)', 'Концентрација c(X) / µg/L', 'Маса (ng)']]
     
                     # 4) Слепа проба
-                    df_blank_processed = None
                     if blank_file is not None:
-                        blank_df = normalize_columns(pd.read_excel(blank_file))
+                        blank_df = pd.read_excel(blank_file)
                         df_blank_processed = process_sample(blank_df, df_std, c_is_start, v_extract, is_name)
                         if df_blank_processed is not None:
-                            st.markdown("### Слепа проба – резултати")
+                            st.markdown("### Слепа проба - внатрешен стандард:")
                             st.dataframe(df_blank_processed.set_index("Ред. бр."))
     
                     # 5) Примероци
@@ -210,7 +207,7 @@ if presmetaj:
                         sample_df = normalize_columns(pd.read_excel(sample_file))
                         df_sample_processed = process_sample(sample_df, df_std, c_is_start, v_extract, is_name)
                         if df_sample_processed is not None:
-                            st.markdown(f"### {sample_name} – резултати (внатрешен стандард, една точка)")
+                            st.markdown(f"### {sample_name} – внатрешен стандард")
                             st.dataframe(df_sample_processed.set_index("Ред. бр."))
                             sample_tables.append((sample_name, df_sample_processed))
     
@@ -243,7 +240,7 @@ if presmetaj:
                             summary.to_excel(writer, sheet_name="Сумирана табела", index=False)
     
                     st.download_button(
-                        label="⬇️ Преземи ги резултатите – Калибрација со една точка",
+                        label="⬇️ Преземи ги резултатите – Внатрешен стандард",
                         data=output.getvalue(),
                         file_name="kalibracija_edna_tocka.xlsx",
                         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -294,7 +291,7 @@ if presmetaj:
             st.write("### Собрани висини од сите стандарди:")
             st.dataframe(result_df)
         else:
-                st.warning("⛔ Првиот стандард мора да ги содржи колоните: Name или name, Height (Hz), height, или Height и RT или RT(min)")
+                st.warning("Првиот стандард мора да ги содржи колоните: Name или name, Height (Hz), height, или Height и RT или RT(min)")
     
     # EKSTERNA KALIBRACIJA
     if method_external_curve and 'result_df' in locals() and result_df is not None and std_concentrations:
@@ -348,7 +345,7 @@ if presmetaj:
             st.write("### Калибрациона права за надворешна калибрација:")
             st.dataframe(df_calibration)
         else:
-            st.warning("⚠️ Нема доволно податоци за да се изврши калибрација.")
+            st.warning("Нема доволно податоци за да се изврши калибрација.")
     
     else:
         st.warning("Нема податоци за резултат или стандардни концентрации за калкулација.")
@@ -385,7 +382,7 @@ if presmetaj:
     blank_final = None
     if df_blank_processed is not None and not df_calibration.empty:
         blank_final = calculate_concentration_and_mass(df_blank_processed, df_calibration, v_extract)
-        st.markdown("### Надворешна калибрациона - Blank:")
+        st.markdown("### Слепа проба - надворешна калибрациона права:")
         st.dataframe(blank_final)
     
     # Пресметка за samples
@@ -810,6 +807,7 @@ if presmetaj:
     
     
     
+
 
 
 
