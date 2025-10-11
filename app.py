@@ -682,110 +682,121 @@ if presmetaj:
     
     # Крајна табела
 
+# --- Крајна сумирана табела ---
+
 def normalize_name_column(df):
     df = df.copy()
     if 'Name' in df.columns:
         df['Name'] = df['Name'].astype(str).str.strip().str.lower()
     return df
 
+
+# земаме редослед на соединенија од првата достапна стандардна табела
 std_names = []
-if method_one_point and not (method_internal_curve or method_external_curve):
-    if 'df_std' in locals() and isinstance(df_std, pd.DataFrame) and 'Name' in df_std.columns:
-        df_std['Name'] = df_std['Name'].astype(str).str.strip().str.lower()
-        std_names = df_std['Name'].dropna().unique().tolist()
-else:
-    combined_std_df = pd.concat(std_dataframes, ignore_index=True) if std_dataframes else pd.DataFrame()
-    if not combined_std_df.empty and 'Name' in combined_std_df.columns:
-        combined_std_df['Name'] = combined_std_df['Name'].astype(str).str.strip().str.lower()
-        std_names = combined_std_df['Name'].dropna().unique().tolist()
+if 'df_std' in locals() and isinstance(df_std, pd.DataFrame) and 'Name' in df_std.columns:
+    std_names = df_std['Name'].astype(str).str.strip().str.lower().dropna().unique().tolist()
+elif 'std_dataframes' in locals() and std_dataframes:
+    for d in std_dataframes:
+        if isinstance(d, pd.DataFrame) and 'Name' in d.columns:
+            std_names.extend(d['Name'].astype(str).str.strip().str.lower().dropna().tolist())
+std_names = list(dict.fromkeys(std_names))  # задржи редослед, отстрани дупликати
 
 df_combined = pd.DataFrame({'Name': std_names})
 
+
 dfs_to_merge = []
 
+# собира што е достапно
 summary = locals().get('summary')
 if isinstance(summary, pd.DataFrame) and not summary.empty:
     df_1p = normalize_name_column(summary)
     df_1p = df_1p.rename(columns=lambda c: f"{c} (One Point)" if c != 'Name' else c)
     dfs_to_merge.append(df_1p)
 
-df_summary_external = locals().get('df_summary_external')
-if isinstance(df_summary_external, pd.DataFrame) and not df_summary_external.empty:
-    df_external = normalize_name_column(df_summary_external)
-    df_external = df_external.rename(columns=lambda c: f"{c} (External Curve)" if c != 'Name' else c)
-    dfs_to_merge.append(df_external)
-
 df_summary_internal = locals().get('df_summary_internal')
 if isinstance(df_summary_internal, pd.DataFrame) and not df_summary_internal.empty:
-    df_internal = normalize_name_column(df_summary_internal)
-    df_internal = df_internal.rename(columns=lambda c: f"{c} (Internal Curve)" if c != 'Name' else c)
-    dfs_to_merge.append(df_internal)
+    df_int = normalize_name_column(df_summary_internal)
+    df_int = df_int.rename(columns=lambda c: f"{c} (Internal Curve)" if c != 'Name' else c)
+    dfs_to_merge.append(df_int)
 
-for df_method in dfs_to_merge:
-    df_combined = df_combined.merge(df_method, on='Name', how='outer')
+df_summary_external = locals().get('df_summary_external')
+if isinstance(df_summary_external, pd.DataFrame) and not df_summary_external.empty:
+    df_ext = normalize_name_column(df_summary_external)
+    df_ext = df_ext.rename(columns=lambda c: f"{c} (External Curve)" if c != 'Name' else c)
+    dfs_to_merge.append(df_ext)
+
+
+# спојување на достапните методи
+for df_m in dfs_to_merge:
+    df_combined = df_combined.merge(df_m, on='Name', how='outer')
 
 df_combined = df_combined.fillna(0)
 
 st.markdown("### Финална табела:")
 st.dataframe(df_combined)
 
-import re
 
+# --- Одземени вредности (Blank) ---
+import re
 df_corrected = df_combined.copy()
 methods = ['One Point', 'Internal Curve', 'External Curve']
 
 for method in methods:
-    sample_cols = [col for col in df_corrected.columns if re.search(rf"sample\s*\d+.*\({re.escape(method)}\)", col, flags=re.IGNORECASE)]
-    blank_col = next((col for col in df_corrected.columns if re.search(rf"blank.*\({re.escape(method)}\)", col, flags=re.IGNORECASE)), None)
+    sample_cols = [c for c in df_corrected.columns if re.search(rf"sample\s*\d+.*\({method}\)", c, flags=re.IGNORECASE)]
+    blank_col = next((c for c in df_corrected.columns if re.search(rf"blank.*\({method}\)", c, flags=re.IGNORECASE)), None)
     if not blank_col or not sample_cols:
         continue
-    for sample_col in sample_cols:
-        match = re.search(r'sample\s*(\d+)', sample_col, flags=re.IGNORECASE)
-        if not match:
+    for sc in sample_cols:
+        m = re.search(r'sample\s*(\d+)', sc, flags=re.IGNORECASE)
+        if not m:
             continue
-        sample_num = match.group(1)
-        new_col = f"Sample {sample_num} - Blank ({method})"
-        df_corrected[new_col] = df_corrected[sample_col] - df_corrected[blank_col]
+        num = m.group(1)
+        new_col = f"Sample {num} - Blank ({method})"
+        df_corrected[new_col] = df_corrected[sc] - df_corrected[blank_col]
 
-result_cols = ['Name'] + [col for col in df_corrected.columns if ' - Blank (' in col]
-df_final = df_corrected[result_cols].copy()
+result_cols = ['Name'] + [c for c in df_corrected.columns if ' - Blank (' in c]
+df_final = df_corrected[result_cols].copy() if len(result_cols) > 1 else pd.DataFrame()
 
-st.markdown("### Финална табела со коригирани вредности:")
-st.dataframe(df_final)
+if not df_final.empty:
+    st.markdown("### Финална табела со коригирани вредности:")
+    st.dataframe(df_final)
 
-blank_cols = [col for col in df_corrected.columns if ' - Blank (' in col]
+
+# --- Реорганизација по примероци ---
+blank_cols = [c for c in df_corrected.columns if ' - Blank (' in c]
 sample_dict = {}
-
-for col in blank_cols:
-    sample_match = re.search(r'Sample (\d+)', col)
-    method_match = re.search(r'\((.+)\)', col)
-    if sample_match and method_match:
-        sample_num = sample_match.group(1)
-        method = method_match.group(1)
-        if sample_num not in sample_dict:
-            sample_dict[sample_num] = []
-        sample_dict[sample_num].append((method, col))
+for c in blank_cols:
+    sm = re.search(r'Sample (\d+)', c)
+    mm = re.search(r'\((.+)\)', c)
+    if sm and mm:
+        s_num = sm.group(1)
+        meth = mm.group(1)
+        sample_dict.setdefault(s_num, []).append((meth, c))
 
 new_cols = ['Name']
-for sample_num in sorted(sample_dict.keys(), key=int):
-    methods_cols_sorted = sorted(sample_dict[sample_num], key=lambda x: methods.index(x[0]) if x[0] in methods else 99)
-    for method, col in methods_cols_sorted:
-        new_col_name = col.replace(" - Blank (", " - ").replace(")", "")
-        df_corrected.rename(columns={col: new_col_name}, inplace=True)
-        new_cols.append(new_col_name)
+for s_num in sorted(sample_dict.keys(), key=int):
+    for meth in methods:
+        for m2, c in sample_dict[s_num]:
+            if m2 == meth:
+                new_name = c.replace(" - Blank (", " - ").replace(")", "")
+                df_corrected.rename(columns={c: new_name}, inplace=True)
+                new_cols.append(new_name)
 
-df_reorganized = df_corrected[new_cols].copy()
+df_reorganized = df_corrected[new_cols].copy() if len(new_cols) > 1 else pd.DataFrame()
 
-st.markdown("### Табела за споредба на методи:")
-st.dataframe(df_reorganized)
+if not df_reorganized.empty:
+    st.markdown("### Табела за споредба на методи:")
+    st.dataframe(df_reorganized)
 
+
+# --- Експорт во Excel ---
 def to_excel(dfs: dict):
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
         for sheet_name, df in dfs.items():
-            df.to_excel(writer, index=False, sheet_name=sheet_name[:31])
-    processed_data = output.getvalue()
-    return processed_data
+            if not df.empty:
+                df.to_excel(writer, index=False, sheet_name=sheet_name[:31])
+    return output.getvalue()
 
 dfs_to_export = {}
 if not df_combined.empty:
@@ -805,16 +816,6 @@ if dfs_to_export:
     )
 
     
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
         
         
         
@@ -839,6 +840,7 @@ if dfs_to_export:
     
     
     
+
 
 
 
