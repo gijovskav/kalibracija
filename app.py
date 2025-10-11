@@ -110,28 +110,25 @@ if presmetaj:
     # PRVA METODA
     if method_one_point:
         def find_column(df, possible_names):
-            """Наоѓа колона во df според листа на можни имиња."""
             for name in possible_names:
                 if name in df.columns:
                     return name
             return None
     
         if std_file_one_point is not None:
-            # Читање на Excel со стандарден документ
             df_std = pd.read_excel(std_file_one_point)
-    
-            # Наоѓање на колони
+            
             name_col = find_column(df_std, ["Name", "name", "NAME"])
             rt_col = find_column(df_std, ["RT","RT (min)", "Retention Time", "retention time", "rt"])
             height_col = find_column(df_std, ["Height", "Height (Hz)", "height", "height (Hz)"])
     
             if None in (name_col, rt_col, height_col):
-                st.error("Не можам да ги најдам потребните колони во стандарден документ.")
+                st.error("Не се најдени сите потребни информации во документот со стандарди.")
             else:
                 # Бараме висина на IS
                 is_mask = df_std[name_col].astype(str) == is_name
                 if not is_mask.any():
-                    st.error(f"Внатрешниот стандард '{is_name}' не е пронајден во стандарден документ.")
+                    st.error(f"Внатрешниот стандард '{is_name}' не е пронајден во документот со стандарди.")
                 else:
                     height_is = df_std.loc[is_mask, height_col].values[0]
                     # Пресметка на RRF
@@ -146,16 +143,19 @@ if presmetaj:
     
                     # Промена на имиња на колоните за подобар приказ
                     df_std = df_std.rename(columns={
-                        name_col: "Name",
+                        name_col: "Соединение",
                         rt_col: "RT (min)",
-                        height_col: "Height (Hz)"
+                        height_col: "Висина (Hz)"
                     })
     
-                    st.markdown("### Табела со RRF:")
-                    st.dataframe(df_std[["Ред. бр.", "Name", "RT (min)", "Height (Hz)", "RRF"]])
+                    st.markdown("### Релативни фактори на одговор:")
+                    st.dataframe(
+                    df_std[["Ред. бр.", "Соединение", "RT (min)", "Висина (Hz)", "RRF"]]
+                    .set_index("Ред. бр.")
+                )
+
     
         def normalize_columns(df):
-            # Препознавање на колона за Name
             name_cols = [col for col in df.columns if col.strip().lower() in ['name', 'compound']]
     
             # Препознавање на RT колона
@@ -820,6 +820,7 @@ if presmetaj:
     
     
     
+
 
 
 
