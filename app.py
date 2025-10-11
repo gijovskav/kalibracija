@@ -149,7 +149,7 @@ if presmetaj:
                         height_col: "Height (Hz)"
                     })
     
-                    st.markdown("### Табела со RRF:")
+                    st.markdown("### Релативен фактои на одговор:")
                     st.dataframe(df_std[["Ред. бр.", "Name", "RT (min)", "Height (Hz)", "RRF"]])
     
         def normalize_columns(df):
@@ -208,7 +208,7 @@ if presmetaj:
             blank_df = pd.read_excel(blank_file)
             df_blank_processed = process_sample(blank_df, df_std, c_is_start, v_extract, is_name)
             if df_blank_processed is not None:
-                st.markdown("### Калибрација со една точка - Blank:")
+                st.markdown("### Слепа проба - внатрешен стандард:")
                 st.dataframe(df_blank_processed)
     
         # --- Пример за samples обработка ---
@@ -217,7 +217,7 @@ if presmetaj:
             sample_df = pd.read_excel(sample_file)
             df_sample_processed = process_sample(sample_df, df_std, c_is_start, v_extract, is_name)
             if df_sample_processed is not None:
-                st.markdown(f"### Калибрација со една точка - Sample {idx + 1}:")
+                st.markdown(f"### Sample {idx + 1} - внатрешен стандард:")
                 st.dataframe(df_sample_processed)
                 sample_tables.append(df_sample_processed)
     
@@ -299,7 +299,7 @@ if presmetaj:
                 else:
                     st.warning(f"⚠️ Стандард {i + 1} нема 'Name' и/или 'Height' колони.")
     
-            st.write("### Собрани висини од сите стандарди:")
+            st.write("### Висини (сите стандарди):")
             st.dataframe(result_df)
         else:
                 st.warning("⛔ Првиот стандард мора да ги содржи колоните: Name или name, Height (Hz), height, или Height и RT или RT(min)")
@@ -393,7 +393,7 @@ if presmetaj:
     blank_final = None
     if df_blank_processed is not None and not df_calibration.empty:
         blank_final = calculate_concentration_and_mass(df_blank_processed, df_calibration, v_extract)
-        st.markdown("### Надворешна калибрациона - Blank:")
+        st.markdown("### Слепа проба - надворешна калибрациона права:")
         st.dataframe(blank_final)
     
     # Пресметка за samples
@@ -402,7 +402,7 @@ if presmetaj:
         for df_sample in sample_tables:
             sample_calc = calculate_concentration_and_mass(df_sample, df_calibration, v_extract)
             samples_final.append(sample_calc)
-            st.markdown(f"### Надворешна калибрациона - Sample {len(samples_final)} :")
+            st.markdown(f"### Sample {len(samples_final) - надворешна калибрациона права} :")
             st.dataframe(sample_calc)
     
     # Сумирана табела
@@ -423,7 +423,7 @@ if presmetaj:
     
         df_summary_external = pd.DataFrame(summary_data)  # <-- сменето име
     
-        st.markdown("### Надворешна калибрациона - сумирано:")
+        st.markdown("### Сумирани резултати од надворешна калибрација:")
         st.dataframe(df_summary_external)  # <-- сменето име
     
         # Генерирање Excel со сите резултати
@@ -567,11 +567,11 @@ if presmetaj:
     
                 if sample_id == "Blank":
                     blank_results.append(df_results_sample)
-                    st.markdown("### Внатрешна калибрациона - Blank")
+                    st.markdown("### Слепа проба - внатрешна калибрациона права")
                     st.dataframe(df_results_sample)
                 else:
                     samples_results.append(df_results_sample)
-                    st.markdown(f"### Внатрешна калибрациона - {sample_id}")
+                    st.markdown(f"### Sample {len(samples_final) - внатрешна калибрациона права} :")
                     st.dataframe(df_results_sample)
     
             # Сумирана табела за внатрешна калибрација
@@ -592,7 +592,7 @@ if presmetaj:
     
             df_summary_internal = pd.DataFrame(summary_rows)  # <-- сменето име
     
-            st.markdown("### Внатрешна калибрациона - сумирано")
+            st.markdown("### Сумирани резултати од калибрација со внатрешна калибрациона права")
             st.dataframe(df_summary_internal)  # <-- сменето име
     
             # Генерирање Excel
@@ -676,7 +676,7 @@ if presmetaj:
     df_combined = df_combined.fillna(0)
     
     # --- Прикажи ја комбинованата табела со сите методи ---
-    st.markdown("### Финална табела со резултати:")
+    st.markdown("### Финална табела:")
     st.dataframe(df_combined)
     
     
@@ -717,7 +717,7 @@ if presmetaj:
     result_cols = ['Name'] + [col for col in df_corrected.columns if ' - Blank (' in col]
     df_final = df_corrected[result_cols].copy()
     
-    st.markdown("### Компаративна табела со одземени слепи проби:")
+    st.markdown("### Финална табела со корегирани вредности:")
     st.dataframe(df_final)
     
     
@@ -758,7 +758,7 @@ if presmetaj:
     # Направи нова табела со редоследот
     df_reorganized = df_corrected[new_cols].copy()
     
-    st.markdown("### Споредба на Samples по метода:")
+    st.markdown("### Табела за споредба на методи:")
     st.dataframe(df_reorganized)
     
     
@@ -832,6 +832,7 @@ if presmetaj:
     
     
     
+
 
 
 
