@@ -30,6 +30,8 @@ st.markdown("### Влезни податоци за анализа")
 blank_file = st.file_uploader("Слепа проба", type=["xls", "xlsx"])
 sample_files = st.file_uploader("Примероци за анализа", type=["xls", "xlsx"], accept_multiple_files=True)
 v_extract = st.number_input("Волумен на конечен екстракт (mL)", min_value=0.0, format="%.1f", key="v_extract")
+decimals = st.number_input("Број на децимални цифри во резултати", min_value=0, max_value=6, value=1, step=1, key="decimals")
+
 
 sample_mapping = {}
 
@@ -856,4 +858,5 @@ if presmetaj:
     )
     
     
+
 
