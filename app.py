@@ -286,38 +286,46 @@ if presmetaj:
         # --- Сумарна табела со сите соединенија и маси во blank и samples ---
         if df_blank_processed is not None and sample_tables:
             summary = df_blank_processed[['Name', 'Маса (ng)']].rename(columns={'Маса (ng)': 'Маса (ng) Blank'})
+        
             for i, df_sample_proc in enumerate(sample_tables):
-                summary = summary.merge(df_sample_proc[['Name', 'Маса (ng)']].rename(columns={'Маса (ng)': f'Маса (ng) Sample {i + 1}'}),
-                                        on='Name', how='outer')
+                col_sample = f'Маса (ng) Sample {i + 1}'
+                summary = summary.merge(
+                    df_sample_proc[['Name', 'Маса (ng)']].rename(columns={'Маса (ng)': col_sample}),
+                    on='Name', how='outer'
+                )
+                # додај коригирана маса (Sample - Blank)
+                summary[f'Маса коригирана за Sample {i + 1}'] = summary[col_sample] - summary['Маса (ng) Blank']
+        
             summary = summary.fillna(0)
-    
+        
             st.markdown("### Калибрација со една точка - сумарна табела:")
             st.dataframe(summary)
-    
+        
         if std_file_one_point is not None and df_std is not None:
             output = io.BytesIO()
             with pd.ExcelWriter(output, engine='openpyxl') as writer:
                 # Табела со стандардниот документ
                 df_std.to_excel(writer, sheet_name="RRFs", index=False)
-    
+        
                 # Blank табела
                 if df_blank_processed is not None:
                     df_blank_processed.to_excel(writer, sheet_name="Blank", index=False)
-    
+        
                 # Samples табели
                 for i, df_sample_proc in enumerate(sample_tables):
                     df_sample_proc.to_excel(writer, sheet_name=f"Sample {i + 1}", index=False)
-    
+        
                 # Сумирана табела
                 if df_blank_processed is not None and sample_tables:
                     summary.to_excel(writer, sheet_name="Сумирано", index=False)
-    
+        
             st.download_button(
                 label="⬇️ Преземи ги резултатите во Excel - Калибрација со една точка",
                 data=output.getvalue(),
                 file_name="kalibracija_edna_tocka.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
+
     
     
     
@@ -856,3 +864,4 @@ if presmetaj:
             mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
         )
         
+
