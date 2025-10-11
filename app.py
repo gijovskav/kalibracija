@@ -717,7 +717,7 @@ if presmetaj:
     result_cols = ['Name'] + [col for col in df_corrected.columns if ' - Blank (' in col]
     df_final = df_corrected[result_cols].copy()
     
-    st.markdown("### Финална табела со корегирани вредности:")
+    st.markdown("### Финална табела со коригирани вредности:")
     st.dataframe(df_final)
     
     
@@ -832,6 +832,7 @@ if presmetaj:
     
     
     
+
 
 
 
