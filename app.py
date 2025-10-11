@@ -293,8 +293,6 @@ if presmetaj:
                     df_sample_proc[['Name', 'Маса (ng)']].rename(columns={'Маса (ng)': col_sample}),
                     on='Name', how='outer'
                 )
-                # додај коригирана маса (Sample - Blank)
-                summary[f'Маса коригирана за Sample {i + 1}'] = summary[col_sample] - summary['Маса (ng) Blank']
         
             summary = summary.fillna(0)
         
@@ -864,4 +862,5 @@ if presmetaj:
             mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
         )
         
+
 
