@@ -402,7 +402,7 @@ if presmetaj:
         for df_sample in sample_tables:
             sample_calc = calculate_concentration_and_mass(df_sample, df_calibration, v_extract)
             samples_final.append(sample_calc)
-            st.markdown(f"### Sample {len(samples_final) - надворешна калибрациона права} :")
+            st.markdown(f"### Sample {len(samples_final)} – надворешна калибрациона права:")
             st.dataframe(sample_calc)
     
     # Сумирана табела
@@ -571,7 +571,7 @@ if presmetaj:
                     st.dataframe(df_results_sample)
                 else:
                     samples_results.append(df_results_sample)
-                    st.markdown(f"### Sample {len(samples_final) - внатрешна калибрациона права} :")
+                    st.markdown(f"### Sample {len(samples_final)} – внатрешна калибрациона права:")
                     st.dataframe(df_results_sample)
     
             # Сумирана табела за внатрешна калибрација
@@ -832,6 +832,7 @@ if presmetaj:
     
     
     
+
 
 
 
