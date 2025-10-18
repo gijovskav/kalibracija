@@ -664,34 +664,30 @@ if presmetaj:
             for df_res in blank_results + samples_results:
                 all_names.update(df_res["Name"].unique())
     
-            if blank_results is not None and samples_results:
-                all_names = set(blank_final["Name"].unique())
-                for df_s in samples_final:
-                    all_names.update(df_s["Name"].unique())
-    
             summary_rows = []
             for name in all_names:
                 row = {"Name": name}
-                blank_mass = blank_final[blank_final["Name"] == name]["Mass (ng)"].sum()
-                row["Blank"] = blank_mass
-                for i, df_s in enumerate(samples_final):
-                    sample_mass = df_s[df_s["Name"] == name]["Mass (ng)"].sum()
-                    row[f"Sample {i + 1}"] = sample_mass
-                    summary_rows.append(row)
+                for i, df_res in enumerate(blank_results):
+                    mass_sum = df_res[df_res["Name"] == name]["Mass (ng)"].sum()
+                    row[f"Blank {i+1}"] = mass_sum
+                for i, df_res in enumerate(samples_results):
+                    mass_sum = df_res[df_res["Name"] == name]["Mass (ng)"].sum()
+                    row[f"Sample {i+1}"] = mass_sum
+                summary_rows.append(row)
     
-            df_summary_internal = pd.DataFrame(summary_rows)  # <-- сменето име
+            df_summary_internal = pd.DataFrame(summary_rows)
 
             blank_row = df_summary_internal.iloc[0].copy()
 
             for col in df_summary_internal.columns[1:]:
-                if col != 'Blank':
+                if col != 'Mass (ng)':
                     diff_col = f'{col} - Blank'
-                    df_summary_internal[diff_col] = df_summary_internal[col] - df_summary_internal['Blank']
+                    df_summary_internal[diff_col] = df_summary_internal[col] - df_summary_internal['Mass (ng)']
     
             st.markdown("### Сумирани резултати од калибрација со внатрешна калибрациона права")
-            st.dataframe(df_summary_internal)  # <-- сменето име
-    
-            # Генерирање Excel
+            st.dataframe(df_summary_internal)
+            
+            
             output_internal = io.BytesIO()
             with pd.ExcelWriter(output_internal, engine="openpyxl") as writer:
                 for i, df_res in enumerate(blank_results):
@@ -888,7 +884,3 @@ if presmetaj:
             file_name='rezultati.xlsx',
             mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
         )
-
-
-
-
