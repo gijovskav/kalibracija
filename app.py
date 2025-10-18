@@ -299,7 +299,7 @@ if presmetaj:
             if not summary.empty:
                 blank_row = summary.iloc[0]
 
-            diff_rows = []
+            diff_rows = pd.DataFrame
 
             for i in range(1,len(summary)):
                 row = summary.iloc[i].copy()
@@ -880,6 +880,7 @@ if presmetaj:
             mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
         )
         
+
 
 
 
