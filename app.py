@@ -296,24 +296,16 @@ if presmetaj:
         
             summary = summary.fillna(0)
 
-            if not summary.empty:
-                blank_row = summary.iloc[0]
+            blank_row = summary.iloc[0].copy()
 
-            diff_rows = pd.DataFrame
+            for col in summary.columns[1:]:
+                if col != 'Маса (ng) Blank':
+                    diff_col = f'{col} - Blank'
+                    summary[diff_col] = summary[col] - summary['Маса (ng) Blank']
 
-            for i in range(1,len(summary)):
-                row = summary.iloc[i].copy()
-                row_diff = row.copy()
-                row_diff[1:] = row[1:] - blank_row[1:]
-                row_diff['Name'] = f"{row['Name']} - Blank"
-                diff_rows.append(row_diff)
 
-            if diff_rows:
-                df_diff = pd.DataFrame(diff_rows)
-                summary = pd.concat([summary, df_diff], ignore_index=True)
-        
             st.markdown("### Калибрација со една точка - сумарна табела:")
-            st.dataframe(summary)
+            st.dataframe(pd.DataFrame(summary))
         
         if std_file_one_point is not None and df_std is not None:
             output = io.BytesIO()
@@ -507,10 +499,17 @@ if presmetaj:
                 row[f"Sample {i + 1}"] = sample_mass
             summary_data.append(row)
     
-        df_summary_external = pd.DataFrame(summary_data)  # <-- сменето име
+        df_summary_external = pd.DataFrame(summary_data)
+
+        blank_row = df_summary_external.iloc[0].copy()
+
+        for col in df_summary_external.columns[1:]:
+            if col != 'Blank':
+                diff_col = f'{col} - Blank'
+                df_summary_external[diff_col] = df_summary_external[col] - df_summary_external['Blank']
     
         st.markdown("### Сумирани резултати од надворешна калибрација:")
-        st.dataframe(df_summary_external)  # <-- сменето име
+        st.dataframe(df_summary_external)
     
         # Генерирање Excel со сите резултати
         output = io.BytesIO()
@@ -677,6 +676,13 @@ if presmetaj:
                 summary_rows.append(row)
     
             df_summary_internal = pd.DataFrame(summary_rows)  # <-- сменето име
+
+            blank_row = df_summary_internal.iloc[0].copy()
+
+            for col in df_summary_internal.columns[1:]:
+                if col != 'Mass (ng)':
+                    diff_col = f'{col} - Blank'
+                    df_summary_internal[diff_col] = df_summary_internal[col] - df_summary_internal['Mass (ng)']
     
             st.markdown("### Сумирани резултати од калибрација со внатрешна калибрациона права")
             st.dataframe(df_summary_internal)  # <-- сменето име
@@ -878,12 +884,3 @@ if presmetaj:
             file_name='rezultati.xlsx',
             mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
         )
-        
-
-
-
-
-
-
-
-
