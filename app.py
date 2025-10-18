@@ -684,9 +684,9 @@ if presmetaj:
             blank_row = df_summary_internal.iloc[0].copy()
 
             for col in df_summary_internal.columns[1:]:
-                if col != 'Mass (ng)':
+                if col != 'Blank':
                     diff_col = f'{col} - Blank'
-                    df_summary_internal[diff_col] = df_summary_internal[col] - df_summary_internal['Mass (ng)']
+                    df_summary_internal[diff_col] = df_summary_internal[col] - df_summary_internal['Blank']
     
             st.markdown("### Сумирани резултати од калибрација со внатрешна калибрациона права")
             st.dataframe(df_summary_internal)  # <-- сменето име
@@ -888,4 +888,5 @@ if presmetaj:
             file_name='rezultati.xlsx',
             mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
         )
+
 
