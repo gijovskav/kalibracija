@@ -467,7 +467,8 @@ if presmetaj:
     
     # Пресметка за samples
     samples_final = []
-    if sample_tables and not df_calibration.empty:
+    if sample_tables:
+        #  and not df_calibration.empty:
         for df_sample in sample_tables:
             sample_calc = calculate_concentration_and_mass(df_sample, df_calibration, v_extract)
             samples_final.append(sample_calc)
@@ -862,5 +863,6 @@ if presmetaj:
             mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
         )
         
+
 
 
