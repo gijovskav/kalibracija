@@ -295,6 +295,23 @@ if presmetaj:
                 )
         
             summary = summary.fillna(0)
+
+            if not summary.empty:
+                blank_row = summary.iloc[0]
+
+            diff_rows = []
+
+            for i in range(1,len(summary)):
+                row = summary.iloc[i].copy()
+                diff_rows
+                row_diff = row.copy()
+                row_diff[1:] = row[1:] - blank_row[1:]
+                row_diff['Name'] = f"{row['Name']} - Blank"
+                diff_rows.append(row_diff)
+
+            if diff_rows:
+                df_diff = pd.DataFrame(diff_rows)
+                summary = pd.concat([summary, df_diff], ignore_index=True)
         
             st.markdown("### Калибрација со една точка - сумарна табела:")
             st.dataframe(summary)
@@ -863,6 +880,7 @@ if presmetaj:
             mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
         )
         
+
 
 
 
