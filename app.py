@@ -664,16 +664,20 @@ if presmetaj:
             for df_res in blank_results + samples_results:
                 all_names.update(df_res["Name"].unique())
     
+            if blank_results is not None and samples_results:
+                all_names = set(blank_final["Name"].unique())
+                for df_s in samples_final:
+                all_names.update(df_s["Name"].unique())
+    
             summary_rows = []
             for name in all_names:
                 row = {"Name": name}
-                for i, df_res in enumerate(blank_results):
-                    mass_sum = df_res[df_res["Name"] == name]["Mass (ng)"].sum()
-                    row[f"Blank {i+1}"] = mass_sum
-                for i, df_res in enumerate(samples_results):
-                    mass_sum = df_res[df_res["Name"] == name]["Mass (ng)"].sum()
-                    row[f"Sample {i+1}"] = mass_sum
-                summary_rows.append(row)
+                blank_mass = blank_final[blank_final["Name"] == name]["Маса (ng)"].sum()
+                row["Blank"] = blank_mass
+                for i, df_s in enumerate(samples_final):
+                    sample_mass = df_s[df_s["Name"] == name]["Маса (ng)"].sum()
+                    row[f"Sample {i + 1}"] = sample_mass
+                    summary_rows.append(row)
     
             df_summary_internal = pd.DataFrame(summary_rows)  # <-- сменето име
 
@@ -884,3 +888,4 @@ if presmetaj:
             file_name='rezultati.xlsx',
             mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
         )
+
