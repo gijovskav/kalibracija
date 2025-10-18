@@ -667,7 +667,7 @@ if presmetaj:
             if blank_results is not None and samples_results:
                 all_names = set(blank_final["Name"].unique())
                 for df_s in samples_final:
-                all_names.update(df_s["Name"].unique())
+                    all_names.update(df_s["Name"].unique())
     
             summary_rows = []
             for name in all_names:
@@ -888,6 +888,7 @@ if presmetaj:
             file_name='rezultati.xlsx',
             mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
         )
+
 
 
 
