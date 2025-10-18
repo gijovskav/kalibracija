@@ -672,10 +672,10 @@ if presmetaj:
             summary_rows = []
             for name in all_names:
                 row = {"Name": name}
-                blank_mass = blank_final[blank_final["Name"] == name]["Маса (ng)"].sum()
+                blank_mass = blank_final[blank_final["Name"] == name]["Mass (ng)"].sum()
                 row["Blank"] = blank_mass
                 for i, df_s in enumerate(samples_final):
-                    sample_mass = df_s[df_s["Name"] == name]["Маса (ng)"].sum()
+                    sample_mass = df_s[df_s["Name"] == name]["Mass (ng)"].sum()
                     row[f"Sample {i + 1}"] = sample_mass
                     summary_rows.append(row)
     
@@ -888,5 +888,6 @@ if presmetaj:
             file_name='rezultati.xlsx',
             mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
         )
+
 
 
