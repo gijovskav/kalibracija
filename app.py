@@ -211,7 +211,7 @@ if presmetaj:
                         height_col: "Height (Hz)"
                     })
     
-                    st.markdown("### Релативен фактои на одговор:")
+                    st.markdown("### Релативен фактор на одговор:")
                     st.dataframe(df_std[["Ред. бр.", "Name", "RT (min)", "Height (Hz)", "RRF"]])
     
         def normalize_columns(df):
@@ -884,3 +884,4 @@ if presmetaj:
             file_name='rezultati.xlsx',
             mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
         )
+
