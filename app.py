@@ -438,31 +438,31 @@ if presmetaj:
         st.warning("Нема податоци за резултат или стандардни концентрации за калкулација.")
     
     
-    def calculate_concentration_and_mass(df, df_calib, v_extract):
-        df_result = df.copy()
-        df_result["c(X) / µg/L"] = None
-        df_result["Маса (ng)"] = None
-    
-        for idx, row in df_result.iterrows():
-            name = row.get("Name")
-            height = row.get("Height") or row.get("Height (Hz)") or row.get("height")
-    
-            if pd.isna(height):
-                continue
-    
-            calib_row = df_calib[df_calib["Name"] == name]
-            if not calib_row.empty:
-                slope = calib_row["Slope"].values[0]
-                intercept = calib_row["Intercept"].values[0]
-    
-                if slope != 0:
-                    conc = (height - intercept) / slope
-                    mass = conc * v_extract
-    
-                    df_result.at[idx, "c(X) / µg/L"] = conc
-                    df_result.at[idx, "Маса (ng)"] = mass
-    
-        return df_result
+        def calculate_concentration_and_mass(df, df_calib, v_extract):
+            df_result = df.copy()
+            df_result["c(X) / µg/L"] = None
+            df_result["Маса (ng)"] = None
+        
+            for idx, row in df_result.iterrows():
+                name = row.get("Name")
+                height = row.get("Height") or row.get("Height (Hz)") or row.get("height")
+        
+                if pd.isna(height):
+                    continue
+        
+                calib_row = df_calib[df_calib["Name"] == name]
+                if not calib_row.empty:
+                    slope = calib_row["Slope"].values[0]
+                    intercept = calib_row["Intercept"].values[0]
+        
+                    if slope != 0:
+                        conc = (height - intercept) / slope
+                        mass = conc * v_extract
+        
+                        df_result.at[idx, "c(X) / µg/L"] = conc
+                        df_result.at[idx, "Маса (ng)"] = mass
+        
+            return df_result
     
     
     # Пресметка за blank
@@ -896,4 +896,5 @@ if presmetaj:
             file_name='rezultati.xlsx',
             mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
         )
+
 
