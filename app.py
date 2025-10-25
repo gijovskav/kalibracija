@@ -735,15 +735,15 @@ if presmetaj:
         # --- Земи ги имињата од стандардните DataFrame-ови ---
         std_names = []
         
-        if method_one_point and not (method_internal_curve or method_external_curve):
-            if 'df_std' in locals() and isinstance(df_std, pd.DataFrame) and 'Name' in df_std.columns:
-                df_std['Name'] = df_std['Name'].astype(str).str.strip().str.lower()
-                std_names = df_std['Name'].dropna().unique().tolist()
-        else:
-            combined_std_df = pd.concat(std_dataframes, ignore_index=True) if std_dataframes else pd.DataFrame()
-            if not combined_std_df.empty and 'Name' in combined_std_df.columns:
-                combined_std_df['Name'] = combined_std_df['Name'].astype(str).str.strip().str.lower()
-                std_names = combined_std_df['Name'].dropna().unique().tolist()
+        # if method_one_point and not (method_internal_curve or method_external_curve):
+        #     if 'df_std' in locals() and isinstance(df_std, pd.DataFrame) and 'Name' in df_std.columns:
+        #         df_std['Name'] = df_std['Name'].astype(str).str.strip().str.lower()
+        #         std_names = df_std['Name'].dropna().unique().tolist()
+        # else:
+        combined_std_df = pd.concat(std_dataframes, ignore_index=True) if std_dataframes else pd.DataFrame()
+        if not combined_std_df.empty and 'Name' in combined_std_df.columns:
+            combined_std_df['Name'] = combined_std_df['Name'].astype(str).str.strip().str.lower()
+            std_names = combined_std_df['Name'].dropna().unique().tolist()
         
         # --- Почетна табела со имиња од стандардот ---
         df_combined = pd.DataFrame({'Name': sorted(std_names)})
@@ -896,3 +896,4 @@ if presmetaj:
             file_name='rezultati.xlsx',
             mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
         )
+
