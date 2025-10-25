@@ -465,69 +465,69 @@ if presmetaj:
             return df_result
     
     
-    # Пресметка за blank
-    blank_final = None
-    if 'df_blank_processed' in locals() and isinstance(df_blank_processed, pd.DataFrame) and not df_blank_processed.empty:
-        if 'df_calibration' in locals() and isinstance(df_calibration, pd.DataFrame) and not df_calibration.empty:
-            blank_final = calculate_concentration_and_mass(df_blank_processed, df_calibration, v_extract)
-            st.markdown("### Слепа проба - надворешна калибрациона права:")
-            st.dataframe(blank_final)
+        # Пресметка за blank
+        blank_final = None
+        if 'df_blank_processed' in locals() and isinstance(df_blank_processed, pd.DataFrame) and not df_blank_processed.empty:
+            if 'df_calibration' in locals() and isinstance(df_calibration, pd.DataFrame) and not df_calibration.empty:
+                blank_final = calculate_concentration_and_mass(df_blank_processed, df_calibration, v_extract)
+                st.markdown("### Слепа проба - надворешна калибрациона права:")
+                st.dataframe(blank_final)
+        
+        # Пресметка за samples
+        samples_final = []
+        if sample_tables:
+            #  and not df_calibration.empty:
+            for df_sample in sample_tables:
+                sample_calc = calculate_concentration_and_mass(df_sample, df_calibration, v_extract)
+                samples_final.append(sample_calc)
+                st.markdown(f"### Sample {len(samples_final)} – надворешна калибрациона права:")
+                st.dataframe(sample_calc)
+        
+        # Сумирана табела
+        if blank_final is not None and samples_final:
+            all_names = set(blank_final["Name"].unique())
+            for df_s in samples_final:
+                all_names.update(df_s["Name"].unique())
+        
+            summary_data = []
+            for name in all_names:
+                row = {"Name": name}
+                blank_mass = blank_final[blank_final["Name"] == name]["Маса (ng)"].sum()
+                row["Blank"] = blank_mass
+                for i, df_s in enumerate(samples_final):
+                    sample_mass = df_s[df_s["Name"] == name]["Маса (ng)"].sum()
+                    row[f"Sample {i + 1}"] = sample_mass
+                summary_data.append(row)
+        
+            df_summary_external = pd.DataFrame(summary_data)
     
-    # Пресметка за samples
-    samples_final = []
-    if sample_tables:
-        #  and not df_calibration.empty:
-        for df_sample in sample_tables:
-            sample_calc = calculate_concentration_and_mass(df_sample, df_calibration, v_extract)
-            samples_final.append(sample_calc)
-            st.markdown(f"### Sample {len(samples_final)} – надворешна калибрациона права:")
-            st.dataframe(sample_calc)
+            blank_row = df_summary_external.iloc[0].copy()
     
-    # Сумирана табела
-    if blank_final is not None and samples_final:
-        all_names = set(blank_final["Name"].unique())
-        for df_s in samples_final:
-            all_names.update(df_s["Name"].unique())
-    
-        summary_data = []
-        for name in all_names:
-            row = {"Name": name}
-            blank_mass = blank_final[blank_final["Name"] == name]["Маса (ng)"].sum()
-            row["Blank"] = blank_mass
-            for i, df_s in enumerate(samples_final):
-                sample_mass = df_s[df_s["Name"] == name]["Маса (ng)"].sum()
-                row[f"Sample {i + 1}"] = sample_mass
-            summary_data.append(row)
-    
-        df_summary_external = pd.DataFrame(summary_data)
-
-        blank_row = df_summary_external.iloc[0].copy()
-
-        for col in df_summary_external.columns[1:]:
-            if col != 'Blank':
-                diff_col = f'{col} - Blank'
-                df_summary_external[diff_col] = df_summary_external[col] - df_summary_external['Blank']
-    
-        st.markdown("### Сумирани резултати од надворешна калибрација:")
-        st.dataframe(df_summary_external)
-    
-        # Генерирање Excel со сите резултати
-        output = io.BytesIO()
-        with pd.ExcelWriter(output, engine="openpyxl") as writer:
-            blank_final.to_excel(writer, sheet_name="Blank", index=False)
-            for i, df_s in enumerate(samples_final):
-                df_s.to_excel(writer, sheet_name=f"Sample {i + 1}", index=False)
-            df_summary_external.to_excel(writer, sheet_name="Сумирано", index=False)
-        output.seek(0)
-    
-        st.download_button(
-            label="⬇️ Симни ги резултатите во ексел - надворешна калибрациона",
-            data=output,
-            file_name="nadvoresna_kalibraciona.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
-    else:
-        st.warning("Не може да се генерира сумарна табела поради недостасувачки резултати за blank или samples.")
+            for col in df_summary_external.columns[1:]:
+                if col != 'Blank':
+                    diff_col = f'{col} - Blank'
+                    df_summary_external[diff_col] = df_summary_external[col] - df_summary_external['Blank']
+        
+            st.markdown("### Сумирани резултати од надворешна калибрација:")
+            st.dataframe(df_summary_external)
+        
+            # Генерирање Excel со сите резултати
+            output = io.BytesIO()
+            with pd.ExcelWriter(output, engine="openpyxl") as writer:
+                blank_final.to_excel(writer, sheet_name="Blank", index=False)
+                for i, df_s in enumerate(samples_final):
+                    df_s.to_excel(writer, sheet_name=f"Sample {i + 1}", index=False)
+                df_summary_external.to_excel(writer, sheet_name="Сумирано", index=False)
+            output.seek(0)
+        
+            st.download_button(
+                label="⬇️ Симни ги резултатите во ексел - надворешна калибрациона",
+                data=output,
+                file_name="nadvoresna_kalibraciona.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
+        else:
+            st.warning("Не може да се генерира сумарна табела поради недостасувачки резултати за blank или samples.")
     
     
     # INTERNA KALIBRACIJA - ПРЕПРАВЕНО
@@ -896,5 +896,6 @@ if presmetaj:
             file_name='rezultati.xlsx',
             mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
         )
+
 
 
