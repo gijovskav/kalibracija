@@ -517,7 +517,7 @@ if presmetaj:
             blank_final.to_excel(writer, sheet_name="Blank", index=False)
             for i, df_s in enumerate(samples_final):
                 df_s.to_excel(writer, sheet_name=f"Sample {i + 1}", index=False)
-            df_summary_external.to_excel(writer, sheet_name="Сумирано", index=False)  # <-- сменето име
+            df_summary_external.to_excel(writer, sheet_name="Сумирано", index=False)
         output.seek(0)
     
         st.download_button(
@@ -530,14 +530,12 @@ if presmetaj:
         st.warning("Не може да се генерира сумарна табела поради недостасувачки резултати за blank или samples.")
     
     
-    # INTERNA KALIBRACIJA
-    # Осигурај се дека result_df и std_concentrations се дефинирани
+    # INTERNA KALIBRACIJA - ПРЕПРАВЕНО
     if 'result_df' not in locals():
         result_df = None
     if 'std_concentrations' not in locals():
         std_concentrations = []
     
-    # Внатрешна калибрација со крива - извршување само ако се вклучи оваа опција
     if method_internal_curve and result_df is not None and std_concentrations:
     
         # 1. Пресметај C(X)/C(IS) регресија базирана на H(X)/H(IS)
@@ -549,7 +547,7 @@ if presmetaj:
         height_cols = [col for col in result_df.columns if col.startswith("Height_")]
     
         for idx, col in enumerate(height_cols):
-            df_std = std_dataframes[idx]  # земи го соодветниот стандард
+            df_std = std_dataframes[idx]
             is_row = df_std[df_std[name_col] == is_name]
     
             if not is_row.empty:
@@ -563,138 +561,151 @@ if presmetaj:
                 st.warning(f"⚠️ IS '{is_name}' не е пронајден во стандард {idx+1}.")
                 ratio_df[f"Ratio_{col.split('_')[-1]}"] = np.nan
     
-        # Ако успешно се пресметани односите, продолжи со регресија
-        if ratio_df is not None:
-            regression_results = []
+        # Регресија за секое соединение
+        regression_results = []
+        for idx, row in ratio_df.iterrows():
+            name = row["Name"]
+            ratios = [row.get(f"Ratio_{i+1}", np.nan) for i in range(len(std_concentrations))]
     
-            for idx, row in ratio_df.iterrows():
-                name = row["Name"]
-                ratios = [row.get(f"Ratio_{i+1}", np.nan) for i in range(len(std_concentrations))]
+            if pd.isna(ratios).any():
+                continue
     
-                if pd.isna(ratios).any():
-                    continue
+            y_vals = np.array(ratios).reshape(-1, 1)
+            model = LinearRegression()
+            model.fit(std_conc_norm, y_vals)
     
-                y_vals = np.array(ratios).reshape(-1, 1)
-                model = LinearRegression()
-                model.fit(std_conc_norm, y_vals)
+            slope = float(model.coef_)
+            intercept = float(model.intercept_)
+            correl = float(np.corrcoef(std_conc_norm.flatten(), y_vals.flatten())[0, 1])
     
-                slope = float(model.coef_)
-                intercept = float(model.intercept_)
-                correl = float(np.corrcoef(std_conc_norm.flatten(), y_vals.flatten())[0, 1])
+            regression_results.append({
+                "Name": name,
+                "H(X)/H(IS)": "; ".join([f"{r:.3f}" for r in ratios]),
+                "c(X)/c(IS)": f"{slope:.6f}",
+                "Intercept": f"{intercept:.6f}",
+                "Correlation": f"{correl:.4f}"
+            })
     
-                regression_results.append({
-                    "Name": name,
-                    "H(X)/H(IS)": "; ".join([f"{r:.3f}" for r in ratios]),
-                    "c(X)/c(IS)": f"{slope:.6f}",
-                    "Intercept": f"{intercept:.6f}",
-                    "Correlation": f"{correl:.4f}"
-                })
+        df_c_over_cis = pd.DataFrame(regression_results)
+        st.markdown("### Внатрешна калибрациона права")
+        st.dataframe(df_c_over_cis)
     
-            df_c_over_cis = pd.DataFrame(regression_results)
-            st.write("df_c_over_cis preview:", df_c_over_cis.head())
+        # 2. Процесирај BLANK (само еден!)
+        df_blank_internal = None
+        if blank_file is not None:
+            df_blank = pd.read_excel(blank_file)
+            is_row = df_blank[df_blank[name_col] == is_name]
     
-            st.markdown("### Внатрешна калибрациона права")
-            st.dataframe(df_c_over_cis)
-    
-            # 2. Примени ги регресиите на бланкови и семплови
-            all_samples = []
-    
-            if blank_file is not None:
-                df_blank = pd.read_excel(blank_file)
-                df_blank["Sample ID"] = "Blank"
-                all_samples.append(df_blank)
-    
-            if sample_files:
-                for idx, f in enumerate(sample_files):
-                    df_sample = pd.read_excel(f)
-                    df_sample["Sample ID"] = f"Sample_{idx+1}"
-                    all_samples.append(df_sample)
-    
-            df_all_samples = pd.concat(all_samples, ignore_index=True)
-    
-            blank_results = []
-            samples_results = []
-    
-            for sample_id in df_all_samples["Sample ID"].unique():
-                df_current = df_all_samples[df_all_samples["Sample ID"] == sample_id]
-                is_row = df_current[df_current[name_col] == is_name]
-    
-                if is_row.empty:
-                    st.warning(f"IS '{is_name}' не е пронајден во {sample_id}.")
-                    continue
-    
-                is_height_val = is_row[height_col_base].values[0]
-    
+            if not is_row.empty:
+                is_height_blank = is_row[height_col_base].values[0]
+                
                 result_rows = []
-                for idx, row in df_current.iterrows():
+                for idx, row in df_blank.iterrows():
                     name = row[name_col]
                     height_val = row[height_col_base]
     
-                    # Најди регресија
                     reg_row = df_c_over_cis[df_c_over_cis["Name"] == name]
-                    if reg_row.empty or pd.isna(height_val) or pd.isna(is_height_val):
+                    if reg_row.empty or pd.isna(height_val) or pd.isna(is_height_blank):
                         continue
     
                     slope = float(reg_row["c(X)/c(IS)"].values[0])
                     intercept = float(reg_row["Intercept"].values[0])
     
-                    conc = ((height_val / is_height_val) - intercept) / slope * c_is_extract
+                    conc = ((height_val / is_height_blank) - intercept) / slope * c_is_extract
                     mass = conc * v_extract
     
                     result_rows.append({
                         "Name": name,
-                        "Height": height_val,
-                        "c(X)/c(IS)": conc,
-                        "Mass (ng)": mass
+                        "Height (Hz)": height_val,
+                        "c(X) / µg/L": conc,
+                        "Маса (ng)": mass
                     })
     
-                df_results_sample = pd.DataFrame(result_rows)
+                df_blank_internal = pd.DataFrame(result_rows)
+                st.markdown("### Слепа проба - внатрешна калибрациона права")
+                st.dataframe(df_blank_internal)
+            else:
+                st.warning(f"IS '{is_name}' не е пронајден во blank.")
     
-                if sample_id == "Blank":
-                    blank_results.append(df_results_sample)
-                    st.markdown("### Слепа проба - внатрешна калибрациона права")
-                    st.dataframe(df_results_sample)
+        # 3. Процесирај SAMPLES
+        samples_internal = []
+        if sample_files:
+            for idx, f in enumerate(sample_files):
+                df_sample = pd.read_excel(f)
+                is_row = df_sample[df_sample[name_col] == is_name]
+    
+                if not is_row.empty:
+                    is_height_sample = is_row[height_col_base].values[0]
+                    
+                    result_rows = []
+                    for idx_row, row in df_sample.iterrows():
+                        name = row[name_col]
+                        height_val = row[height_col_base]
+    
+                        reg_row = df_c_over_cis[df_c_over_cis["Name"] == name]
+                        if reg_row.empty or pd.isna(height_val) or pd.isna(is_height_sample):
+                            continue
+    
+                        slope = float(reg_row["c(X)/c(IS)"].values[0])
+                        intercept = float(reg_row["Intercept"].values[0])
+    
+                        conc = ((height_val / is_height_sample) - intercept) / slope * c_is_extract
+                        mass = conc * v_extract
+    
+                        result_rows.append({
+                            "Name": name,
+                            "Height (Hz)": height_val,
+                            "c(X) / µg/L": conc,
+                            "Маса (ng)": mass
+                        })
+    
+                    df_sample_result = pd.DataFrame(result_rows)
+                    samples_internal.append(df_sample_result)
+                    st.markdown(f"### Sample {idx + 1} – внатрешна калибрациона права:")
+                    st.dataframe(df_sample_result)
                 else:
-                    samples_results.append(df_results_sample)
-                    st.markdown(f"### Sample {len(samples_final)} – внатрешна калибрациона права:")
-                    st.dataframe(df_results_sample)
+                    st.warning(f"IS '{is_name}' не е пронајден во Sample {idx + 1}.")
     
-            # Сумирана табела за внатрешна калибрација
-            all_names = set()
-            for df_res in blank_results + samples_results:
-                all_names.update(df_res["Name"].unique())
+        # 4. СУМАРНА ТАБЕЛА (како другите два метода!)
+        if df_blank_internal is not None and samples_internal:
+            # Земи ги сите уникатни имиња
+            all_names = set(df_blank_internal["Name"].unique())
+            for df_s in samples_internal:
+                all_names.update(df_s["Name"].unique())
     
-            summary_rows = []
+            summary_data = []
             for name in all_names:
                 row = {"Name": name}
-                for i, df_res in enumerate(blank_results):
-                    mass_sum = df_res[df_res["Name"] == name]["Mass (ng)"].sum()
-                    row[f"Blank {i+1}"] = mass_sum
-                for i, df_res in enumerate(samples_results):
-                    mass_sum = df_res[df_res["Name"] == name]["Mass (ng)"].sum()
-                    row[f"Sample {i+1}"] = mass_sum
-                summary_rows.append(row)
+                
+                # Маса од blank (само еден!)
+                blank_mass = df_blank_internal[df_blank_internal["Name"] == name]["Маса (ng)"].sum()
+                row["Blank"] = blank_mass
+                
+                # Маса од секој sample
+                for i, df_s in enumerate(samples_internal):
+                    sample_mass = df_s[df_s["Name"] == name]["Маса (ng)"].sum()
+                    row[f"Sample {i + 1}"] = sample_mass
+                
+                summary_data.append(row)
     
-            df_summary_internal = pd.DataFrame(summary_rows)
-
-            blank_row = df_summary_internal.iloc[0].copy()
-
-            for col in df_summary_internal.columns[1:]:
-                if col != 'Mass (ng)':
+            df_summary_internal = pd.DataFrame(summary_data)
+    
+            # Креирај колони со одземени вредности (Sample - Blank)
+            for col in df_summary_internal.columns:
+                if col.startswith('Sample'):
                     diff_col = f'{col} - Blank'
-                    df_summary_internal[diff_col] = df_summary_internal[col] - df_summary_internal['Mass (ng)']
+                    df_summary_internal[diff_col] = df_summary_internal[col] - df_summary_internal['Blank']
     
             st.markdown("### Сумирани резултати од калибрација со внатрешна калибрациона права")
             st.dataframe(df_summary_internal)
             
-            
+            # 5. Excel Download
             output_internal = io.BytesIO()
             with pd.ExcelWriter(output_internal, engine="openpyxl") as writer:
-                for i, df_res in enumerate(blank_results):
-                    df_res.to_excel(writer, sheet_name=f"Blank_{i+1}", index=False)
-                for i, df_res in enumerate(samples_results):
-                    df_res.to_excel(writer, sheet_name=f"Sample_{i+1}", index=False)
-                df_summary_internal.to_excel(writer, sheet_name="Summary", index=False)  # <-- сменето име
+                df_blank_internal.to_excel(writer, sheet_name="Blank", index=False)
+                for i, df_res in enumerate(samples_internal):
+                    df_res.to_excel(writer, sheet_name=f"Sample {i+1}", index=False)
+                df_summary_internal.to_excel(writer, sheet_name="Сумирано", index=False)
             output_internal.seek(0)
     
             st.download_button(
@@ -703,6 +714,8 @@ if presmetaj:
                 file_name="vnatresna_kalibraciona.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
+        else:
+            st.warning("Нема доволно податоци за да се креира сумарна табела.")
     else:
         st.warning("Нема доволно податоци за внатрешна калибрациона крива.")
                     
@@ -862,7 +875,6 @@ if presmetaj:
             with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
                 for sheet_name, df in dfs.items():
                     df.to_excel(writer, index=False, sheet_name=sheet_name)
-                # writer.save()  # Оваа линија се брише
             processed_data = output.getvalue()
             return processed_data
         
@@ -884,4 +896,3 @@ if presmetaj:
             file_name='rezultati.xlsx',
             mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
         )
-
