@@ -17,6 +17,15 @@ summary = None
 std_dataframes = []
 df_blank_results = pd.DataFrame()
 df_samples_results = pd.DataFrame()
+
+# Функција за заокружување на нумерички колони
+def round_numeric_columns(df, decimals=2):
+    """Заокружува нумерички колони на одреден број децимали"""
+    df_rounded = df.copy()
+    numeric_cols = df_rounded.select_dtypes(include=[np.number]).columns
+    for col in numeric_cols:
+        df_rounded[col] = df_rounded[col].round(decimals)
+    return df_rounded
     
 
 # Избор на метода
@@ -41,17 +50,14 @@ if sample_files:
         default_id = f"Примерок {idx+1}"
         filename = file.name
 
-        # Прекрстување на фајл
         custom_name = st.text_input(
             f"Корисничко име за {default_id}",
             value=default_id,
             key=f"sample_name_{idx}"
         )
 
-        # Го запишуваме во речникот
         sample_mapping[filename] = custom_name
 
-        # Податоци за приказ во табела
         mapping_data.append({
             "Реден број": default_id,
             "Име на датотека": filename,
@@ -76,7 +82,6 @@ def _replace_text_tokens(text, name_map):
     if not isinstance(text, str) or not name_map:
         return text
     out = text
-    # подолгите клучеви прво, за да нема делумни замени
     for k in sorted(name_map.keys(), key=len, reverse=True):
         out = re.sub(rf"\b{re.escape(k)}\b", name_map[k], out)
     return out
@@ -92,10 +97,8 @@ def _replace_df_labels(df, name_map):
         df2.index.name = _replace_text_tokens(str(df2.index.name), name_map)
     return df2
 
-# изградете мапа еднаш по именувањето
 _name_map = _build_name_map(sample_files, sample_mapping)
 
-# --- патчирање на streamlit прикази (само текст/табели) ---
 _st_markdown = st.markdown
 def _patched_markdown(body, *args, **kwargs):
     return _st_markdown(_replace_text_tokens(body, _name_map), *args, **kwargs)
@@ -113,12 +116,10 @@ def _patched_dataframe(data=None, *args, **kwargs):
     return _st_data_frame(data, *args, **kwargs)
 st.dataframe = _patched_dataframe
 
-# --- патчирање на pandas.to_excel за лист-имиња и колони ---
 _pd_to_excel = pd.DataFrame.to_excel
 def _patched_to_excel(self, excel_writer, sheet_name="Sheet1", *args, **kwargs):
     sheet_name = _replace_text_tokens(sheet_name, _name_map)
     df2 = _replace_df_labels(self, _name_map)
-    # Excel limit 31 знаци за име на лист
     sheet_name = sheet_name[:31] if isinstance(sheet_name, str) else sheet_name
     return _pd_to_excel(df2, excel_writer, sheet_name=sheet_name, *args, **kwargs)
 pd.DataFrame.to_excel = _patched_to_excel
@@ -177,10 +178,8 @@ if presmetaj:
             return None
     
         if std_file_one_point is not None:
-            # Читање на Excel со стандарден документ
             df_std = pd.read_excel(std_file_one_point)
     
-            # Наоѓање на колони
             name_col = find_column(df_std, ["Name", "name", "NAME"])
             rt_col = find_column(df_std, ["RT","RT (min)", "Retention Time", "retention time", "rt"])
             height_col = find_column(df_std, ["Height", "Height (Hz)", "height", "height (Hz)"])
@@ -188,45 +187,36 @@ if presmetaj:
             if None in (name_col, rt_col, height_col):
                 st.error("Не можам да ги најдам потребните колони во стандарден документ.")
             else:
-                # Бараме висина на IS
                 is_mask = df_std[name_col].astype(str) == is_name
                 if not is_mask.any():
                     st.error(f"Внатрешниот стандард '{is_name}' не е пронајден во стандарден документ.")
                 else:
                     height_is = df_std.loc[is_mask, height_col].values[0]
-                    # Пресметка на RRF
                     df_std['RRF'] = df_std.apply(
                         lambda row: (row[height_col] / height_is) * (c_is_start / conc_one_point)
                         if row[name_col] != is_name else 1.0,
                         axis=1
                     )
     
-                    # Создавање на реден број
                     df_std.insert(0, "Ред. бр.", range(1, len(df_std) + 1))
     
-                    # Промена на имиња на колоните за подобар приказ
                     df_std = df_std.rename(columns={
                         name_col: "Name",
                         rt_col: "RT (min)",
                         height_col: "Height (Hz)"
                     })
+                    
+                    df_std = round_numeric_columns(df_std)
     
                     st.markdown("### Релативен фактор на одговор:")
                     st.dataframe(df_std[["Ред. бр.", "Name", "RT (min)", "Height (Hz)", "RRF"]])
     
         def normalize_columns(df):
-            # Препознавање на колона за Name
             name_cols = [col for col in df.columns if col.strip().lower() in ['name', 'compound']]
-    
-            # Препознавање на RT колона
             rt_cols = [col for col in df.columns if any(x in col.lower() for x in ['rt (min)', 'rt'])]
-    
-            # Препознавање на Height колона
             height_cols = [col for col in df.columns if 'height' in col.lower()]
     
             norm_df = pd.DataFrame()
-    
-            # Избор на соодветни колони, ако се најдени
             norm_df['Name'] = df[name_cols[0]] if name_cols else None
             norm_df['RT (min)'] = df[rt_cols[0]] if rt_cols else None
             norm_df['Height (Hz)'] = df[height_cols[0]] if height_cols else None
@@ -234,7 +224,6 @@ if presmetaj:
             return norm_df
     
         def process_sample(df_sample, df_std, c_is_start, v_extract, is_name):
-            # Наоѓање на IS висина во sample
             is_mask_sample = df_sample['Name'].astype(str) == is_name
             if not is_mask_sample.any():
                 st.error(f"Внатрешниот стандард '{is_name}' не е пронајден во sample документ.")
@@ -242,10 +231,8 @@ if presmetaj:
             
             height_is_sample = df_sample.loc[is_mask_sample, 'Height (Hz)'].values[0]
     
-            # Генерира реден број
             df_sample.insert(0, "Ред. бр.", range(1, len(df_sample) + 1))
     
-            # Наоѓање RRF од стандарди според Name
             def get_rrf(name):
                 match = df_std[df_std['Name'] == name]
                 if not match.empty:
@@ -255,17 +242,16 @@ if presmetaj:
     
             df_sample['RRF'] = df_sample['Name'].apply(get_rrf)
     
-            # Пресметка на c(X)
             df_sample['c(X) / µg L-1'] = df_sample.apply(lambda row: 
                 (row['Height (Hz)'] / height_is_sample) * (c_is_start / row['RRF']) 
                 if row['RRF'] else None, axis=1)
     
-            # Пресметка на маса во ng
             df_sample['Маса (ng)'] = df_sample['c(X) / µg L-1'] * v_extract
+            
+            df_sample = round_numeric_columns(df_sample)
     
             return df_sample[['Ред. бр.', 'Name', 'RT (min)', 'Height (Hz)', 'RRF', 'c(X) / µg L-1', 'Маса (ng)']]
     
-           # --- Пример за blank обработка ---
         if blank_file is not None:
             blank_df = pd.read_excel(blank_file)
             df_blank_processed = process_sample(blank_df, df_std, c_is_start, v_extract, is_name)
@@ -273,7 +259,6 @@ if presmetaj:
                 st.markdown("### Слепа проба - внатрешен стандард:")
                 st.dataframe(df_blank_processed)
     
-        # --- Пример за samples обработка ---
         sample_tables = []
         for idx, sample_file in enumerate(sample_files):
             sample_df = pd.read_excel(sample_file)
@@ -283,7 +268,6 @@ if presmetaj:
                 st.dataframe(df_sample_processed)
                 sample_tables.append(df_sample_processed)
     
-        # --- Сумарна табела со сите соединенија и маси во blank и samples ---
         if df_blank_processed is not None and sample_tables:
             summary = df_blank_processed[['Name', 'Маса (ng)']].rename(columns={'Маса (ng)': 'Маса (ng) Blank'})
         
@@ -302,7 +286,8 @@ if presmetaj:
                 if col != 'Маса (ng) Blank':
                     diff_col = f'{col} - Blank'
                     summary[diff_col] = summary[col] - summary['Маса (ng) Blank']
-
+            
+            summary = round_numeric_columns(summary)
 
             st.markdown("### Калибрација со една точка - сумарна табела:")
             st.dataframe(pd.DataFrame(summary))
@@ -310,18 +295,14 @@ if presmetaj:
         if std_file_one_point is not None and df_std is not None:
             output = io.BytesIO()
             with pd.ExcelWriter(output, engine='openpyxl') as writer:
-                # Табела со стандардниот документ
                 df_std.to_excel(writer, sheet_name="RRFs", index=False)
         
-                # Blank табела
                 if df_blank_processed is not None:
                     df_blank_processed.to_excel(writer, sheet_name="Blank", index=False)
         
-                # Samples табели
                 for i, df_sample_proc in enumerate(sample_tables):
                     df_sample_proc.to_excel(writer, sheet_name=f"Sample {i + 1}", index=False)
         
-                # Сумирана табела
                 if df_blank_processed is not None and sample_tables:
                     summary.to_excel(writer, sheet_name="Сумирано", index=False)
         
@@ -342,6 +323,7 @@ if presmetaj:
             if file is not None:
                 df = pd.read_excel(file)
                 std_dataframes.append(df)
+                
     def get_column_name(possible_names, columns):
         for name in possible_names:
             if name in columns:
@@ -374,11 +356,13 @@ if presmetaj:
                     result_df = result_df.merge(df_merge, on="Name", how="left")
                 else:
                     st.warning(f"⚠️ Стандард {i + 1} нема 'Name' и/или 'Height' колони.")
+            
+            result_df = round_numeric_columns(result_df)
     
             st.write("### Висини (сите стандарди):")
             st.dataframe(result_df)
         else:
-                st.warning("⛔ Првиот стандард мора да ги содржи колоните: Name или name, Height (Hz), height, или Height и RT или RT(min)")
+            st.warning("⛔ Првиот стандард мора да ги содржи колоните: Name или name, Height (Hz), height, или Height и RT или RT(min)")
     
     # EKSTERNA KALIBRACIJA
     if method_external_curve and 'result_df' in locals() and result_df is not None and std_concentrations:
@@ -386,23 +370,21 @@ if presmetaj:
     
         X_full = np.array(std_concentrations).reshape(-1, 1)
     
-        df_blank_processed = None
+        df_blank_processed_ext = None
         if blank_file is not None:
-            df_blank_processed = pd.read_excel(blank_file)
+            df_blank_processed_ext = pd.read_excel(blank_file)
     
-        sample_tables = []
+        sample_tables_ext = []
         if sample_files:
             for f in sample_files:
-                sample_tables.append(pd.read_excel(f))
+                sample_tables_ext.append(pd.read_excel(f))
     
-        # Филтрирање на колоните што се само Height_X
         height_columns = [col for col in result_df.columns if col.startswith("Height_")]
     
         for index, row in result_df.iterrows():
             name = row["Name"]
             heights = row[height_columns].values
     
-            # Комбинирај ги само валидните парови
             valid_pairs = [(x, y) for x, y in zip(std_concentrations, heights) if pd.notna(y)]
     
             if len(valid_pairs) < 2:
@@ -427,61 +409,54 @@ if presmetaj:
             })
     
         df_calibration = pd.DataFrame(calibration_data)
+        df_calibration = round_numeric_columns(df_calibration)
     
         if not df_calibration.empty:
             st.write("### Калибрациона права за надворешна калибрација:")
             st.dataframe(df_calibration)
-        else:
-            st.warning("⚠️ Нема доволно податоци за да се изврши калибрација.")
-    
-    else:
-        st.warning("Нема податоци за резултат или стандардни концентрации за калкулација.")
-    
-    
-        def calculate_concentration_and_mass(df, df_calib, v_extract):
-            df_result = df.copy()
-            df_result["c(X) / µg/L"] = None
-            df_result["Маса (ng)"] = None
-        
-            for idx, row in df_result.iterrows():
-                name = row.get("Name")
-                height = row.get("Height") or row.get("Height (Hz)") or row.get("height")
-        
-                if pd.isna(height):
-                    continue
-        
-                calib_row = df_calib[df_calib["Name"] == name]
-                if not calib_row.empty:
-                    slope = calib_row["Slope"].values[0]
-                    intercept = calib_row["Intercept"].values[0]
-        
-                    if slope != 0:
-                        conc = (height - intercept) / slope
-                        mass = conc * v_extract
-        
-                        df_result.at[idx, "c(X) / µg/L"] = conc
-                        df_result.at[idx, "Маса (ng)"] = mass
-        
-            return df_result
-    
-    
-        # Пресметка за blank
+            
+            # Функција за пресметка на концентрација и маса
+            def calculate_concentration_and_mass(df, df_calib, v_extract):
+                df_result = df.copy()
+                df_result["c(X) / µg/L"] = None
+                df_result["Маса (ng)"] = None
+            
+                for idx, row in df_result.iterrows():
+                    name = row.get("Name")
+                    height = row.get("Height") or row.get("Height (Hz)") or row.get("height")
+            
+                    if pd.isna(height):
+                        continue
+            
+                    calib_row = df_calib[df_calib["Name"] == name]
+                    if not calib_row.empty:
+                        slope = calib_row["Slope"].values[0]
+                        intercept = calib_row["Intercept"].values[0]
+            
+                        if slope != 0:
+                            conc = (height - intercept) / slope
+                            mass = conc * v_extract
+            
+                            df_result.at[idx, "c(X) / µg/L"] = conc
+                            df_result.at[idx, "Маса (ng)"] = mass
+                
+                df_result = round_numeric_columns(df_result)
+                return df_result
+            
+            # Пресметка за blank
             blank_final = None
-            if 'df_blank_processed' in locals() and isinstance(df_blank_processed, pd.DataFrame) and not df_blank_processed.empty:
-                if 'df_calibration' in locals() and isinstance(df_calibration, pd.DataFrame) and not df_calibration.empty:
-                    blank_final = calculate_concentration_and_mass(df_blank_processed, df_calibration, v_extract)
-                    st.markdown("### Слепа проба - надворешна калибрациона права:")
-                    st.dataframe(blank_final)
+            if df_blank_processed_ext is not None:
+                blank_final = calculate_concentration_and_mass(df_blank_processed_ext, df_calibration, v_extract)
+                st.markdown("### Слепа проба - надворешна калибрациона права:")
+                st.dataframe(blank_final)
             
             # Пресметка за samples
             samples_final = []
-            if sample_tables:
-                #  and not df_calibration.empty:
-                for df_sample in sample_tables:
-                    sample_calc = calculate_concentration_and_mass(df_sample, df_calibration, v_extract)
-                    samples_final.append(sample_calc)
-                    st.markdown(f"### Sample {len(samples_final)} – надворешна калибрациона права:")
-                    st.dataframe(sample_calc)
+            for idx, df_sample in enumerate(sample_tables_ext):
+                sample_calc = calculate_concentration_and_mass(df_sample, df_calibration, v_extract)
+                samples_final.append(sample_calc)
+                st.markdown(f"### Sample {idx + 1} – надворешна калибрациона права:")
+                st.dataframe(sample_calc)
             
             # Сумирана табела
             if blank_final is not None and samples_final:
@@ -501,17 +476,17 @@ if presmetaj:
             
                 df_summary_external = pd.DataFrame(summary_data)
         
-                blank_row = df_summary_external.iloc[0].copy()
-        
                 for col in df_summary_external.columns[1:]:
                     if col != 'Blank':
                         diff_col = f'{col} - Blank'
                         df_summary_external[diff_col] = df_summary_external[col] - df_summary_external['Blank']
+                
+                df_summary_external = round_numeric_columns(df_summary_external)
             
                 st.markdown("### Сумирани резултати од надворешна калибрација:")
                 st.dataframe(df_summary_external)
             
-                # Генерирање Excel со сите резултати
+                # Excel download
                 output = io.BytesIO()
                 with pd.ExcelWriter(output, engine="openpyxl") as writer:
                     blank_final.to_excel(writer, sheet_name="Blank", index=False)
@@ -526,11 +501,11 @@ if presmetaj:
                     file_name="nadvoresna_kalibraciona.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 )
-            else:
-                st.warning("Не може да се генерира сумарна табела поради недостасувачки резултати за blank или samples.")
+        else:
+            st.warning("⚠️ Нема доволно податоци за да се изврши калибрација.")
     
     
-    # INTERNA KALIBRACIJA - ПРЕПРАВЕНО
+    # INTERNA KALIBRACIJA
     if 'result_df' not in locals():
         result_df = None
     if 'std_concentrations' not in locals():
@@ -538,11 +513,9 @@ if presmetaj:
     
     if method_internal_curve and result_df is not None and std_concentrations:
     
-        # 1. Пресметај C(X)/C(IS) регресија базирана на H(X)/H(IS)
         std_conc_norm = np.array(std_concentrations) / c_is_extract
         std_conc_norm = std_conc_norm.reshape(-1, 1)
     
-        # Подготви ratio_df = H(X)/H(IS) за секој стандард
         ratio_df = result_df[["Name"]].copy()
         height_cols = [col for col in result_df.columns if col.startswith("Height_")]
     
@@ -561,7 +534,6 @@ if presmetaj:
                 st.warning(f"⚠️ IS '{is_name}' не е пронајден во стандард {idx+1}.")
                 ratio_df[f"Ratio_{col.split('_')[-1]}"] = np.nan
     
-        # Регресија за секое соединение
         regression_results = []
         for idx, row in ratio_df.iterrows():
             name = row["Name"]
@@ -590,7 +562,6 @@ if presmetaj:
         st.markdown("### Внатрешна калибрациона права")
         st.dataframe(df_c_over_cis)
     
-        # 2. Процесирај BLANK (само еден!)
         df_blank_internal = None
         if blank_file is not None:
             df_blank = pd.read_excel(blank_file)
@@ -622,12 +593,12 @@ if presmetaj:
                     })
     
                 df_blank_internal = pd.DataFrame(result_rows)
+                df_blank_internal = round_numeric_columns(df_blank_internal)
                 st.markdown("### Слепа проба - внатрешна калибрациона права")
                 st.dataframe(df_blank_internal)
             else:
                 st.warning(f"IS '{is_name}' не е пронајден во blank.")
     
-        # 3. Процесирај SAMPLES
         samples_internal = []
         if sample_files:
             for idx, f in enumerate(sample_files):
@@ -660,15 +631,14 @@ if presmetaj:
                         })
     
                     df_sample_result = pd.DataFrame(result_rows)
+                    df_sample_result = round_numeric_columns(df_sample_result)
                     samples_internal.append(df_sample_result)
                     st.markdown(f"### Sample {idx + 1} – внатрешна калибрациона права:")
                     st.dataframe(df_sample_result)
                 else:
                     st.warning(f"IS '{is_name}' не е пронајден во Sample {idx + 1}.")
     
-        # 4. СУМАРНА ТАБЕЛА (како другите два метода!)
         if df_blank_internal is not None and samples_internal:
-            # Земи ги сите уникатни имиња
             all_names = set(df_blank_internal["Name"].unique())
             for df_s in samples_internal:
                 all_names.update(df_s["Name"].unique())
@@ -677,11 +647,9 @@ if presmetaj:
             for name in all_names:
                 row = {"Name": name}
                 
-                # Маса од blank (само еден!)
                 blank_mass = df_blank_internal[df_blank_internal["Name"] == name]["Маса (ng)"].sum()
                 row["Blank"] = blank_mass
                 
-                # Маса од секој sample
                 for i, df_s in enumerate(samples_internal):
                     sample_mass = df_s[df_s["Name"] == name]["Маса (ng)"].sum()
                     row[f"Sample {i + 1}"] = sample_mass
@@ -690,16 +658,16 @@ if presmetaj:
     
             df_summary_internal = pd.DataFrame(summary_data)
     
-            # Креирај колони со одземени вредности (Sample - Blank)
             for col in df_summary_internal.columns:
                 if col.startswith('Sample'):
                     diff_col = f'{col} - Blank'
                     df_summary_internal[diff_col] = df_summary_internal[col] - df_summary_internal['Blank']
+            
+            df_summary_internal = round_numeric_columns(df_summary_internal)
     
             st.markdown("### Сумирани резултати од калибрација со внатрешна калибрациона права")
             st.dataframe(df_summary_internal)
             
-            # 5. Excel Download
             output_internal = io.BytesIO()
             with pd.ExcelWriter(output_internal, engine="openpyxl") as writer:
                 df_blank_internal.to_excel(writer, sheet_name="Blank", index=False)
@@ -722,7 +690,7 @@ if presmetaj:
     
     
     
-  #krajna tabela
+    # KRAJNA TABELA
 
     if method_one_point and method_internal_curve and method_external_curve:
     
@@ -732,63 +700,44 @@ if presmetaj:
                 df['Name'] = df['Name'].astype(str).str.strip().str.lower()
             return df
         
-        # --- Земи ги имињата од стандардните DataFrame-ови ---
         std_names = []
         
-        # if method_one_point and not (method_internal_curve or method_external_curve):
-        #     if 'df_std' in locals() and isinstance(df_std, pd.DataFrame) and 'Name' in df_std.columns:
-        #         df_std['Name'] = df_std['Name'].astype(str).str.strip().str.lower()
-        #         std_names = df_std['Name'].dropna().unique().tolist()
-        # else:
         combined_std_df = pd.concat(std_dataframes, ignore_index=True) if std_dataframes else pd.DataFrame()
         if not combined_std_df.empty and 'Name' in combined_std_df.columns:
             combined_std_df['Name'] = combined_std_df['Name'].astype(str).str.strip().str.lower()
             std_names = combined_std_df['Name'].dropna().unique().tolist()
         
-        # --- Почетна табела со имиња од стандардот ---
         df_combined = pd.DataFrame({'Name': sorted(std_names)})
         
-        # --- Подготовка на листа со DataFrame-ови за спојување ---
         dfs_to_merge = []
         
-        # Вметни го One Point
         summary = locals().get('summary')
         if isinstance(summary, pd.DataFrame) and not summary.empty:
             df_1p = normalize_name_column(summary)
             df_1p = df_1p.rename(columns=lambda c: f"{c} (One Point)" if c != 'Name' else c)
             dfs_to_merge.append(df_1p)
         
-        # Вметни го External Curve
         df_summary_external = locals().get('df_summary_external')
         if isinstance(df_summary_external, pd.DataFrame) and not df_summary_external.empty:
             df_external = normalize_name_column(df_summary_external)
             df_external = df_external.rename(columns=lambda c: f"{c} (External Curve)" if c != 'Name' else c)
             dfs_to_merge.append(df_external)
         
-        # Вметни го Internal Curve
         df_summary_internal = locals().get('df_summary_internal')
         if isinstance(df_summary_internal, pd.DataFrame) and not df_summary_internal.empty:
             df_internal = normalize_name_column(df_summary_internal)
             df_internal = df_internal.rename(columns=lambda c: f"{c} (Internal Curve)" if c != 'Name' else c)
             dfs_to_merge.append(df_internal)
         
-        
-        
-        # --- Спојување според 'Name' колона ---
         for df_method in dfs_to_merge:
             df_combined = df_combined.merge(df_method, on='Name', how='left')
         
-        # --- Пополнување празни вредности со 0 ---
         df_combined = df_combined.fillna(0)
+        df_combined = round_numeric_columns(df_combined)
         
-        # --- Прикажи ја комбинованата табела со сите методи ---
         st.markdown("### Финална табела:")
         st.dataframe(df_combined)
         
-        
-        
-        
-        #odzemanja
         import re
         
         df_corrected = df_combined.copy()
@@ -796,51 +745,37 @@ if presmetaj:
         methods = ['One Point', 'Internal Curve', 'External Curve']
         
         for method in methods:
-            # Наоѓање sample колони што содржат методот во заграда (пример: "Sample 1 (One Point)")
             sample_cols = [col for col in df_corrected.columns if re.search(rf"sample\s*\d+.*\({re.escape(method)}\)", col, flags=re.IGNORECASE)]
-        
-            # Наоѓање blank колона со методот во заграда (пример: "Blank (One Point)")
             blank_col = next((col for col in df_corrected.columns if re.search(rf"blank.*\({re.escape(method)}\)", col, flags=re.IGNORECASE)), None)
         
             if not blank_col or not sample_cols:
-                # Ако нема blank колона или нема sample колони за овој метод, прескокни
                 continue
         
             for sample_col in sample_cols:
-                # Извлекување на бројот од sample колоната, на пример "Sample 1"
                 match = re.search(r'sample\s*(\d+)', sample_col, flags=re.IGNORECASE)
                 if not match:
                     continue
                 sample_num = match.group(1)
         
-                # Име на новата колона со резултат после одземање
                 new_col = f"Sample {sample_num} - Blank ({method})"
-        
-                # Одземање на blank од sample колона
                 df_corrected[new_col] = df_corrected[sample_col] - df_corrected[blank_col]
         
-        # Избери само 'Name' и новите колони со одземени вредности
         result_cols = ['Name'] + [col for col in df_corrected.columns if ' - Blank (' in col]
         df_final = df_corrected[result_cols].copy()
+        df_final = round_numeric_columns(df_final)
         
         st.markdown("### Финална табела со коригирани вредности:")
         st.dataframe(df_final)
         
-        
-        
-        #finalna reoorganizirana
         import re
         
-        # Земаме колони кои се одземаат (на пример: "Sample 1 - Blank (One Point)")
         blank_cols = [col for col in df_corrected.columns if ' - Blank (' in col]
         
-        # Ќе направиме речник: key=sample_num, value=list на колони (со сите методи)
         sample_dict = {}
         
         for col in blank_cols:
-            # Извлечи бројка од sample колона
             sample_match = re.search(r'Sample (\d+)', col)
-            method_match = re.search(r'\((.+)\)', col)  # методот во заграда
+            method_match = re.search(r'\((.+)\)', col)
             if sample_match and method_match:
                 sample_num = sample_match.group(1)
                 method = method_match.group(1)
@@ -849,27 +784,21 @@ if presmetaj:
                     sample_dict[sample_num] = []
                 sample_dict[sample_num].append((method, col))
         
-        # Сега ќе направиме нова листа колони за редослед: за секој sample по методи сортирано (на пример алфабетски по метод)
         new_cols = ['Name']
         
         for sample_num in sorted(sample_dict.keys(), key=int):
-            # Сортираме по метод за поубава презентација (можеш и по некој хемиски ред ако сакаш)
             methods_cols_sorted = sorted(sample_dict[sample_num], key=lambda x: x[0])
             for method, col in methods_cols_sorted:
-                # За името на колоната правиме "Sample 1 - One Point"
                 new_col_name = col.replace(" - Blank (", " - ").replace(")", "")
                 df_corrected.rename(columns={col: new_col_name}, inplace=True)
                 new_cols.append(new_col_name)
         
-        # Направи нова табела со редоследот
         df_reorganized = df_corrected[new_cols].copy()
+        df_reorganized = round_numeric_columns(df_reorganized)
         
         st.markdown("### Табела за споредба на методи:")
         st.dataframe(df_reorganized)
         
-        
-        #ексел за трите табели
-        # Функција за експортирање на повеќе DataFrame во еден Excel фајл со повеќе sheet-ови
         def to_excel(dfs: dict):
             output = io.BytesIO()
             with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
@@ -878,25 +807,20 @@ if presmetaj:
             processed_data = output.getvalue()
             return processed_data
         
-        
-        # Словар со сите DataFrame-ови што сакаш да ги експортираш
         dfs_to_export = {
             'Финална табела': df_combined,
             'Компаративна (одземени blank)': df_final,
             'Реорганизирана по samples': df_reorganized
         }
         
-        # Креирање на Excel фајл во меморија
         excel_data = to_excel(dfs_to_export)
         
-        # Копче за симнување
         st.download_button(
             label="Симни ги сумарните табели како Ексел",
             data=excel_data,
             file_name='rezultati.xlsx',
             mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
         )
-
 
 
 
